@@ -48,27 +48,32 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      console.log('Attempting login...');
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'same-origin',
+        credentials: 'include',
         body: JSON.stringify({ username, password }),
       });
 
+      console.log('Login response status:', response.status);
       const data = await response.json();
+      console.log('Login response data:', data);
 
       if (response.ok) {
+        console.log('Login successful, redirecting...');
         // Wait a bit for cookie to be set, then navigate
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 200));
         window.location.href = '/';
       } else {
+        console.error('Login failed:', data.error);
         setError(data.error || 'Login failed');
       }
     } catch (error) {
+      console.error('Login exception:', error);
       setError('Failed to connect to server');
-      console.error(error);
     } finally {
       setLoading(false);
     }
