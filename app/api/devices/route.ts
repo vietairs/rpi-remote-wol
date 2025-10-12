@@ -19,7 +19,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, macAddress } = body;
+    const { name, macAddress, ipAddress } = body;
 
     if (!name || !macAddress) {
       return NextResponse.json(
@@ -37,6 +37,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate IP address format if provided
+    if (ipAddress) {
+      const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+      if (!ipRegex.test(ipAddress)) {
+        return NextResponse.json(
+          { error: 'Invalid IP address format' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Check if MAC address already exists
     const existing = deviceDb.getByMac(macAddress);
     if (existing) {
@@ -49,6 +60,7 @@ export async function POST(request: NextRequest) {
     const deviceInput: DeviceInput = {
       name,
       mac_address: macAddress,
+      ip_address: ipAddress,
     };
 
     const device = deviceDb.create(deviceInput);

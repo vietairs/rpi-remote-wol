@@ -6,6 +6,7 @@ export interface Device {
   id: number;
   name: string;
   mac_address: string;
+  ip_address: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -13,6 +14,7 @@ export interface Device {
 export interface DeviceInput {
   name: string;
   mac_address: string;
+  ip_address?: string;
 }
 
 let db: Database.Database | null = null;
@@ -43,10 +45,24 @@ function getDb(): Database.Database {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         mac_address TEXT NOT NULL UNIQUE,
+        ip_address TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Migration: Add ip_address column if it doesn't exist
+    try {
+      const columns = db.pragma('table_info(devices)') as Array<{ name: string }>;
+      const hasIpAddress = columns.some(col => col.name === 'ip_address');
+
+      if (!hasIpAddress) {
+        db.exec('ALTER TABLE devices ADD COLUMN ip_address TEXT');
+      }
+    } catch (error) {
+      // Column might already exist or table doesn't exist yet
+      console.log('Migration check:', error);
+    }
   }
 
   return db;
@@ -75,10 +91,14 @@ export const deviceDb = {
   create: (device: DeviceInput): Device => {
     const database = getDb();
     const insertStmt = database.prepare(`
-      INSERT INTO devices (name, mac_address)
-      VALUES (@name, @mac_address)
+      INSERT INTO devices (name, mac_address, ip_address)
+      VALUES (@name, @mac_address, @ip_address)
     `);
-    const result = insertStmt.run(device);
+    const result = insertStmt.run({
+      name: device.name,
+      mac_address: device.mac_address,
+      ip_address: device.ip_address || null,
+    });
 
     const getStmt = database.prepare('SELECT * FROM devices WHERE id = ?');
     return getStmt.get(result.lastInsertRowid) as Device;
@@ -88,10 +108,15 @@ export const deviceDb = {
     const database = getDb();
     const updateStmt = database.prepare(`
       UPDATE devices
-      SET name = @name, mac_address = @mac_address, updated_at = CURRENT_TIMESTAMP
+      SET name = @name, mac_address = @mac_address, ip_address = @ip_address, updated_at = CURRENT_TIMESTAMP
       WHERE id = @id
     `);
-    updateStmt.run({ id, ...device });
+    updateStmt.run({
+      id,
+      name: device.name,
+      mac_address: device.mac_address,
+      ip_address: device.ip_address || null,
+    });
 
     const getStmt = database.prepare('SELECT * FROM devices WHERE id = ?');
     return getStmt.get(id) as Device | undefined;

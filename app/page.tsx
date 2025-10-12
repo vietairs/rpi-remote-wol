@@ -1,28 +1,60 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface Device {
   id: number;
   name: string;
   mac_address: string;
+  ip_address: string | null;
   created_at: string;
   updated_at: string;
+}
+
+interface DeviceStatus {
+  online: boolean;
+  rdpReady: boolean;
+  checking: boolean;
+  waking: boolean;
 }
 
 export default function Home() {
   const [status, setStatus] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [macAddress, setMacAddress] = useState<string>('');
+  const [ipAddress, setIpAddress] = useState<string>('');
   const [deviceName, setDeviceName] = useState<string>('');
   const [savedDevices, setSavedDevices] = useState<Device[]>([]);
   const [showSaveForm, setShowSaveForm] = useState<boolean>(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
+  const [deviceStatuses, setDeviceStatuses] = useState<Map<number, DeviceStatus>>(new Map());
+  const statusCheckInterval = useRef<NodeJS.Timeout | null>(null);
+  const wakeMonitorTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Load saved devices on mount
   useEffect(() => {
     loadDevices();
+    return () => {
+      if (statusCheckInterval.current) clearInterval(statusCheckInterval.current);
+      if (wakeMonitorTimeout.current) clearTimeout(wakeMonitorTimeout.current);
+    };
   }, []);
+
+  // Start periodic status checks
+  useEffect(() => {
+    if (savedDevices.length > 0) {
+      checkAllDeviceStatuses();
+      statusCheckInterval.current = setInterval(() => {
+        checkAllDeviceStatuses();
+      }, 30000); // Check every 30 seconds
+    }
+
+    return () => {
+      if (statusCheckInterval.current) {
+        clearInterval(statusCheckInterval.current);
+      }
+    };
+  }, [savedDevices]);
 
   const loadDevices = async () => {
     try {
@@ -34,6 +66,108 @@ export default function Home() {
     } catch (error) {
       console.error('Failed to load devices:', error);
     }
+  };
+
+  const checkDeviceStatus = async (device: Device): Promise<DeviceStatus> => {
+    if (!device.ip_address) {
+      return { online: false, rdpReady: false, checking: false, waking: false };
+    }
+
+    try {
+      const response = await fetch('/api/status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ipAddress: device.ip_address }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        return {
+          online: data.online,
+          rdpReady: data.rdpReady,
+          checking: false,
+          waking: false,
+        };
+      }
+    } catch (error) {
+      console.error(`Failed to check status for ${device.name}:`, error);
+    }
+
+    return { online: false, rdpReady: false, checking: false, waking: false };
+  };
+
+  const checkAllDeviceStatuses = useCallback(async () => {
+    const newStatuses = new Map<number, DeviceStatus>();
+
+    for (const device of savedDevices) {
+      if (device.ip_address) {
+        setDeviceStatuses(prev => new Map(prev.set(device.id, {
+          ...prev.get(device.id),
+          checking: true,
+          online: prev.get(device.id)?.online || false,
+          rdpReady: prev.get(device.id)?.rdpReady || false,
+          waking: prev.get(device.id)?.waking || false,
+        })));
+
+        const deviceStatus = await checkDeviceStatus(device);
+        newStatuses.set(device.id, {
+          ...deviceStatus,
+          waking: deviceStatuses.get(device.id)?.waking || false,
+        });
+      }
+    }
+
+    setDeviceStatuses(prev => {
+      const updated = new Map(prev);
+      newStatuses.forEach((status, id) => {
+        updated.set(id, status);
+      });
+      return updated;
+    });
+  }, [savedDevices]);
+
+  const monitorDeviceAfterWake = async (device: Device) => {
+    if (!device.ip_address) return;
+
+    const maxAttempts = 12; // Monitor for 60 seconds (12 * 5 seconds)
+    let attempts = 0;
+
+    const checkStatus = async () => {
+      attempts++;
+      const deviceStatus = await checkDeviceStatus(device);
+
+      setDeviceStatuses(prev => new Map(prev.set(device.id, {
+        ...deviceStatus,
+        waking: !deviceStatus.online && attempts < maxAttempts,
+      })));
+
+      if (deviceStatus.online) {
+        if (deviceStatus.rdpReady) {
+          setStatus(`${device.name} is online and ready for Remote Desktop!`);
+        } else {
+          setStatus(`${device.name} is online but RDP is not ready yet`);
+        }
+        return;
+      }
+
+      if (attempts < maxAttempts) {
+        wakeMonitorTimeout.current = setTimeout(checkStatus, 5000);
+      } else {
+        setDeviceStatuses(prev => new Map(prev.set(device.id, {
+          ...prev.get(device.id),
+          waking: false,
+          online: false,
+          rdpReady: false,
+          checking: false,
+        })));
+        setStatus(`${device.name} did not respond after wake attempt`);
+      }
+    };
+
+    setTimeout(checkStatus, 3000); // Start checking after 3 seconds
   };
 
   const handleWake = async () => {
@@ -58,6 +192,18 @@ export default function Home() {
 
       if (response.ok) {
         setStatus(`Success! Wake packet sent to ${data.macAddress}`);
+
+        // Find the device and start monitoring
+        const device = savedDevices.find(d => d.mac_address === macAddress);
+        if (device && device.ip_address) {
+          setDeviceStatuses(prev => new Map(prev.set(device.id, {
+            online: false,
+            rdpReady: false,
+            checking: false,
+            waking: true,
+          })));
+          monitorDeviceAfterWake(device);
+        }
       } else {
         setStatus(`Error: ${data.error}`);
       }
@@ -66,6 +212,37 @@ export default function Home() {
       console.error(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDiscoverIp = async () => {
+    if (!macAddress) {
+      setStatus('Please enter a MAC address first');
+      return;
+    }
+
+    setStatus('Discovering IP address...');
+
+    try {
+      const response = await fetch('/api/discover-ip', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ macAddress }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setIpAddress(data.ipAddress);
+        setStatus(`Found IP address: ${data.ipAddress}`);
+      } else {
+        setStatus(data.message || 'Could not find IP address');
+      }
+    } catch (error) {
+      setStatus('Failed to discover IP address');
+      console.error(error);
     }
   };
 
@@ -81,7 +258,11 @@ export default function Home() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name: deviceName, macAddress }),
+        body: JSON.stringify({
+          name: deviceName,
+          macAddress,
+          ipAddress: ipAddress || undefined,
+        }),
       });
 
       const data = await response.json();
@@ -89,6 +270,7 @@ export default function Home() {
       if (response.ok) {
         setStatus(`Device "${deviceName}" saved successfully!`);
         setDeviceName('');
+        setIpAddress('');
         setShowSaveForm(false);
         await loadDevices();
       } else {
@@ -115,7 +297,13 @@ export default function Home() {
         if (selectedDeviceId === id) {
           setSelectedDeviceId(null);
           setMacAddress('');
+          setIpAddress('');
         }
+        setDeviceStatuses(prev => {
+          const updated = new Map(prev);
+          updated.delete(id);
+          return updated;
+        });
         await loadDevices();
       } else {
         const data = await response.json();
@@ -129,13 +317,76 @@ export default function Home() {
 
   const handleSelectDevice = (device: Device) => {
     setMacAddress(device.mac_address);
+    setIpAddress(device.ip_address || '');
     setSelectedDeviceId(device.id);
     setStatus(`Selected: ${device.name}`);
   };
 
+  const getStatusBadge = (device: Device) => {
+    const deviceStatus = deviceStatuses.get(device.id);
+
+    if (!device.ip_address) {
+      return (
+        <span className="text-xs px-2 py-1 rounded bg-gray-500/20 text-gray-300">
+          No IP
+        </span>
+      );
+    }
+
+    if (deviceStatus?.checking) {
+      return (
+        <span className="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-300 flex items-center gap-1">
+          <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+          Checking
+        </span>
+      );
+    }
+
+    if (deviceStatus?.waking) {
+      return (
+        <span className="text-xs px-2 py-1 rounded bg-yellow-500/20 text-yellow-300 flex items-center gap-1 animate-pulse">
+          <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
+          </svg>
+          Waking
+        </span>
+      );
+    }
+
+    if (deviceStatus?.online) {
+      if (deviceStatus.rdpReady) {
+        return (
+          <span className="text-xs px-2 py-1 rounded bg-green-500/20 text-green-300 flex items-center gap-1">
+            <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            RDP Ready
+          </span>
+        );
+      }
+      return (
+        <span className="text-xs px-2 py-1 rounded bg-green-500/20 text-green-300 flex items-center gap-1">
+          <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+          Online
+        </span>
+      );
+    }
+
+    return (
+      <span className="text-xs px-2 py-1 rounded bg-red-500/20 text-red-300">
+        Offline
+      </span>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 flex items-center justify-center p-4">
-      <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8 w-full max-w-2xl border border-white/20">
+      <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8 w-full max-w-4xl border border-white/20">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-white mb-2">
             PC Remote Wake
@@ -215,6 +466,27 @@ export default function Home() {
                   placeholder="Device name (e.g., Gaming PC)"
                   className="w-full px-4 py-2 bg-white/10 border border-white/30 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={ipAddress}
+                      onChange={(e) => setIpAddress(e.target.value)}
+                      placeholder="IP Address (optional)"
+                      className="flex-1 px-4 py-2 bg-white/10 border border-white/30 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                    <button
+                      onClick={handleDiscoverIp}
+                      className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors whitespace-nowrap"
+                      title="Auto-discover IP from MAC address"
+                    >
+                      🔍 Find IP
+                    </button>
+                  </div>
+                  <p className="text-xs text-blue-200">
+                    IP address enables status monitoring. Click Find IP to auto-discover.
+                  </p>
+                </div>
                 <div className="flex gap-2">
                   <button
                     onClick={handleSaveDevice}
@@ -226,6 +498,7 @@ export default function Home() {
                     onClick={() => {
                       setShowSaveForm(false);
                       setDeviceName('');
+                      setIpAddress('');
                     }}
                     className="flex-1 bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
                   >
@@ -236,10 +509,10 @@ export default function Home() {
             )}
           </div>
 
-          {/* Right column - Saved devices */}
+          {/* Right column - Saved devices with status */}
           <div>
             <h3 className="text-white font-semibold mb-3">Saved Devices</h3>
-            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+            <div className="space-y-2 max-h-[500px] overflow-y-auto">
               {savedDevices.length === 0 ? (
                 <p className="text-blue-200 text-sm text-center py-4">
                   No saved devices yet
@@ -255,14 +528,22 @@ export default function Home() {
                     }`}
                     onClick={() => handleSelectDevice(device)}
                   >
-                    <div className="flex justify-between items-start">
+                    <div className="flex justify-between items-start mb-2">
                       <div className="flex-1">
-                        <h4 className="text-white font-medium">
-                          {device.name}
-                        </h4>
-                        <p className="text-blue-200 text-xs mt-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="text-white font-medium">
+                            {device.name}
+                          </h4>
+                          {getStatusBadge(device)}
+                        </div>
+                        <p className="text-blue-200 text-xs">
                           {device.mac_address}
                         </p>
+                        {device.ip_address && (
+                          <p className="text-blue-300 text-xs mt-1">
+                            IP: {device.ip_address}
+                          </p>
+                        )}
                       </div>
                       <button
                         onClick={(e) => {
@@ -297,9 +578,9 @@ export default function Home() {
         {status && (
           <div
             className={`mt-6 p-4 rounded-lg ${
-              status.includes('Success') || status.includes('saved')
+              status.includes('Success') || status.includes('saved') || status.includes('ready')
                 ? 'bg-green-500/20 border border-green-500/50 text-green-100'
-                : status.includes('Error') || status.includes('Failed')
+                : status.includes('Error') || status.includes('Failed') || status.includes('not respond')
                 ? 'bg-red-500/20 border border-red-500/50 text-red-100'
                 : 'bg-blue-500/20 border border-blue-500/50 text-blue-100'
             }`}
@@ -314,6 +595,7 @@ export default function Home() {
             <li>Enable Wake-on-LAN in your PC BIOS/UEFI</li>
             <li>Enable WOL in Windows Network Adapter settings</li>
             <li>Find your PC MAC address (ipconfig /all)</li>
+            <li>Add IP address for status monitoring (optional)</li>
             <li>Ensure PC and Raspberry Pi are on same network</li>
           </ol>
         </div>
