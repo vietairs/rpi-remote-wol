@@ -53,14 +53,16 @@ export default function LoginPage() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'same-origin',
         body: JSON.stringify({ username, password }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        router.push('/');
-        router.refresh();
+        // Wait a bit for cookie to be set, then navigate
+        await new Promise(resolve => setTimeout(resolve, 100));
+        window.location.href = '/';
       } else {
         setError(data.error || 'Login failed');
       }
