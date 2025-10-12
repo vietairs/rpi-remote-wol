@@ -56,9 +56,10 @@ export async function POST(request: NextRequest) {
     });
 
     // Set session cookie on the response
+    // Only use secure cookies when actually on HTTPS (not just production mode)
     response.cookies.set('session', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: false, // Set to true only when using HTTPS
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7, // 7 days
       path: '/',
