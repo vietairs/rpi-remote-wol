@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { userDb } from '@/lib/db';
-import { verifyPassword, createSession, setSessionCookie } from '@/lib/auth';
+import { verifyPassword, createSession } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,17 +33,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create session
+    // Create session token
     const token = await createSession(user.id, user.username);
-    await setSessionCookie(token);
 
-    return NextResponse.json({
+    // Create response with cookie
+    const response = NextResponse.json({
       success: true,
       user: {
         id: user.id,
         username: user.username,
       },
     });
+
+    // Set session cookie on the response
+    response.cookies.set('session', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: '/',
+    });
+
+    return response;
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json(
