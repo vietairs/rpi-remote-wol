@@ -1,36 +1,210 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PC Remote Wake - Wake-on-LAN Controller
 
-## Getting Started
+A Next.js web application for remotely waking your Windows 11 PC from sleep or powered-off state using Wake-on-LAN (WOL). Designed to run on a Raspberry Pi.
 
-First, run the development server:
+## Features
 
+- ⚡ Send Wake-on-LAN magic packets to your PC
+- 💾 Save and manage multiple devices with SQLite database
+- 🔄 Persistent storage - devices are saved between sessions
+- 🎯 Quick device selection from saved list
+- 🎨 Modern, responsive UI with real-time status updates
+- 🔒 MAC address validation
+- 📱 Mobile-friendly design
+- 🌐 Accessible from any device on your network
+
+## Prerequisites
+
+### Windows 11 PC Setup
+
+1. **Enable Wake-on-LAN in BIOS/UEFI:**
+   - Restart your PC and enter BIOS (usually Del, F2, or F12)
+   - Look for "Wake on LAN" or "Power On By PCI-E" settings
+   - Enable the option and save
+
+2. **Enable WOL in Windows:**
+   - Open Device Manager
+   - Expand "Network adapters"
+   - Right-click your network adapter → Properties
+   - Go to "Power Management" tab
+   - Check "Allow this device to wake the computer"
+   - Check "Only allow a magic packet to wake the computer"
+   - Go to "Advanced" tab
+   - Enable "Wake on Magic Packet"
+   - Click OK
+
+3. **Find Your PC's MAC Address:**
+   ```bash
+   ipconfig /all
+   ```
+   Look for "Physical Address" under your network adapter
+
+4. **Disable Fast Startup (Recommended):**
+   - Control Panel → Power Options → Choose what the power buttons do
+   - Click "Change settings that are currently unavailable"
+   - Uncheck "Turn on fast startup"
+
+### Raspberry Pi Setup
+
+1. **Install Node.js** (if not already installed):
+   ```bash
+   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+   sudo apt-get install -y nodejs
+   ```
+
+2. **Ensure your Raspberry Pi is on the same network** as your PC
+
+## Installation
+
+1. **Clone or copy this project to your Raspberry Pi**
+
+2. **Install dependencies:**
+   ```bash
+   cd rpi-remote-wol
+   npm install
+   ```
+
+3. **Build the production version:**
+   ```bash
+   npm run build
+   ```
+
+## Running the Application
+
+### Development Mode
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+Access at: `http://localhost:3000`
+
+### Production Mode
+```bash
+npm run build
+npm start
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Run on Different Port
+```bash
+PORT=8080 npm start
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Access from Other Devices
+Find your Raspberry Pi's IP address:
+```bash
+hostname -I
+```
+Then access from any device on your network: `http://<raspberry-pi-ip>:3000`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Usage
 
-## Learn More
+### First Time Setup
 
-To learn more about Next.js, take a look at the following resources:
+1. Open the web interface in your browser
+2. Enter your PC's MAC address (format: XX:XX:XX:XX:XX:XX)
+3. Click "💾 Save This Device" button
+4. Enter a friendly name for your device (e.g., "Gaming PC", "Work Desktop")
+5. Click Save
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Waking Your PC
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Select a saved device from the right panel (or enter MAC address manually)
+2. Click "⚡ Wake PC" button
+3. Your PC should wake up within a few seconds
 
-## Deploy on Vercel
+### Managing Devices
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Add new device**: Enter MAC address and click "💾 Save This Device"
+- **Select device**: Click on any saved device to load its MAC address
+- **Delete device**: Click the trash icon on any saved device
+- **Manual entry**: You can still enter MAC addresses manually without saving
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Running as a System Service (Optional)
+
+To keep the application running on boot:
+
+1. **Create a systemd service:**
+   ```bash
+   sudo nano /etc/systemd/system/pc-wake.service
+   ```
+
+2. **Add the following content:**
+   ```ini
+   [Unit]
+   Description=PC Wake-on-LAN Web Interface
+   After=network.target
+
+   [Service]
+   Type=simple
+   User=pi
+   WorkingDirectory=/home/pi/rpi-remote-wol
+   ExecStart=/usr/bin/npm start
+   Restart=on-failure
+   Environment=NODE_ENV=production
+   Environment=PORT=3000
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+
+3. **Enable and start the service:**
+   ```bash
+   sudo systemctl enable pc-wake.service
+   sudo systemctl start pc-wake.service
+   ```
+
+4. **Check status:**
+   ```bash
+   sudo systemctl status pc-wake.service
+   ```
+
+## Troubleshooting
+
+### PC doesn't wake up
+
+- **Check BIOS/UEFI settings:** Ensure WOL is enabled
+- **Disable Fast Startup:** Windows Fast Startup can prevent WOL
+- **Use Ethernet:** WOL works more reliably over wired connections
+- **Check Windows settings:** Verify network adapter power management
+- **Firewall:** Ensure UDP port 9 (WOL) is not blocked on your network
+- **Test from same network:** Ensure Raspberry Pi and PC are on same subnet
+
+### Cannot access web interface
+
+- **Check if service is running:** `npm run dev` or check systemd status
+- **Check firewall on Raspberry Pi:** `sudo ufw allow 3000`
+- **Verify IP address:** Use correct Raspberry Pi IP
+- **Check port:** Ensure the port (default 3000) is correct
+
+### Invalid MAC address error
+
+- MAC address must be in format: `XX:XX:XX:XX:XX:XX` or `XX-XX-XX-XX-XX-XX`
+- Use uppercase or lowercase letters (both work)
+- Verify MAC address using `ipconfig /all` on Windows
+
+## Technical Details
+
+- **Framework:** Next.js 15 with App Router
+- **Styling:** Tailwind CSS
+- **Wake-on-LAN:** wake_on_lan npm package
+- **Database:** SQLite (better-sqlite3) for persistent device storage
+- **Runtime:** Node.js
+
+### Database Location
+
+The SQLite database is stored at `data/devices.db` in the project directory. This file is automatically created on first run and persists all saved devices.
+
+## Network Requirements
+
+- Both devices must be on the same local network (LAN)
+- Router must allow broadcast packets for WOL
+- Some networks may block WOL packets (check router settings)
+
+## Security Notes
+
+- This application is designed for local network use only
+- Do not expose directly to the internet without proper security measures
+- Consider adding authentication if deploying in a shared network environment
+
+## License
+
+MIT
