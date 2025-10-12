@@ -8,6 +8,9 @@ A Next.js web application for remotely waking your Windows 11 PC from sleep or p
 - 💾 Save and manage multiple devices with SQLite database
 - 🔄 Persistent storage - devices are saved between sessions
 - 🎯 Quick device selection from saved list
+- 📊 Real-time device status monitoring (Online/Offline/RDP Ready)
+- 🔍 Auto IP discovery from MAC address (ARP lookup)
+- 🔐 Secure authentication system with login page
 - 🎨 Modern, responsive UI with real-time status updates
 - 🔒 MAC address validation
 - 📱 Mobile-friendly design
@@ -64,7 +67,21 @@ A Next.js web application for remotely waking your Windows 11 PC from sleep or p
    npm install
    ```
 
-3. **Build the production version:**
+3. **Configure environment variables:**
+   ```bash
+   cp .env.example .env
+   nano .env
+   ```
+   Generate a secure JWT secret:
+   ```bash
+   openssl rand -base64 32
+   ```
+   Add it to your `.env` file:
+   ```
+   JWT_SECRET=your-generated-secret-here
+   ```
+
+4. **Build the production version:**
    ```bash
    npm run build
    ```
@@ -97,26 +114,56 @@ Then access from any device on your network: `http://<raspberry-pi-ip>:3000`
 
 ## Usage
 
-### First Time Setup
+### First Time Setup - Creating Admin Account
 
 1. Open the web interface in your browser
-2. Enter your PC's MAC address (format: XX:XX:XX:XX:XX:XX)
+2. You'll be redirected to the setup page automatically
+3. Create your admin account:
+   - Enter a username
+   - Enter a password (minimum 6 characters)
+   - Confirm your password
+4. Click "Create Admin Account"
+5. You'll be redirected to the login page
+
+### Logging In
+
+1. Enter your username and password
+2. Click "Sign In"
+3. You'll be taken to the main dashboard
+
+### Adding Devices
+
+1. Enter your PC's MAC address (format: XX:XX:XX:XX:XX:XX)
+2. (Optional) Click "🔍 Find IP" to auto-discover the IP address
 3. Click "💾 Save This Device" button
 4. Enter a friendly name for your device (e.g., "Gaming PC", "Work Desktop")
-5. Click Save
+5. (Optional) Enter or auto-discover the IP address for status monitoring
+6. Click Save
 
 ### Waking Your PC
 
 1. Select a saved device from the right panel (or enter MAC address manually)
 2. Click "⚡ Wake PC" button
-3. Your PC should wake up within a few seconds
+3. Watch the status change from "Waking" to "Online" to "RDP Ready"
+4. Your PC should wake up within a few seconds
+
+### Device Status Indicators
+
+- **RDP Ready** (Green) - Device is online and Remote Desktop is accessible
+- **Online** (Green) - Device is reachable but RDP is not confirmed
+- **Offline** (Red) - Device is not responding
+- **Waking** (Yellow, animated) - Wake packet sent, waiting for device to come online
+- **Checking** (Blue) - Currently checking device status
+- **No IP** (Gray) - No IP address configured for this device
 
 ### Managing Devices
 
 - **Add new device**: Enter MAC address and click "💾 Save This Device"
+- **Auto-discover IP**: Click "🔍 Find IP" to automatically find the device's IP address
 - **Select device**: Click on any saved device to load its MAC address
 - **Delete device**: Click the trash icon on any saved device
 - **Manual entry**: You can still enter MAC addresses manually without saving
+- **Logout**: Click the "Logout" button in the top right corner
 
 ## Running as a System Service (Optional)
 
@@ -185,13 +232,27 @@ To keep the application running on boot:
 
 - **Framework:** Next.js 15 with App Router
 - **Styling:** Tailwind CSS
+- **Authentication:** JWT-based sessions with bcryptjs password hashing
 - **Wake-on-LAN:** wake_on_lan npm package
-- **Database:** SQLite (better-sqlite3) for persistent device storage
+- **Status Monitoring:** TCP port checking (ports 445, 3389)
+- **IP Discovery:** ARP table lookup via system commands
+- **Database:** SQLite (better-sqlite3) for persistent storage
 - **Runtime:** Node.js
 
 ### Database Location
 
-The SQLite database is stored at `data/devices.db` in the project directory. This file is automatically created on first run and persists all saved devices.
+The SQLite database is stored at `data/devices.db` in the project directory. This file is automatically created on first run and persists:
+- User accounts (hashed passwords)
+- Saved devices with MAC addresses and IP addresses
+
+### Security Features
+
+- JWT-based session management with HTTP-only cookies
+- Bcrypt password hashing (10 rounds)
+- Session expiration (7 days)
+- Protected routes via middleware
+- Secure cookie settings in production
+- First-time setup workflow for admin account creation
 
 ## Network Requirements
 
@@ -201,9 +262,15 @@ The SQLite database is stored at `data/devices.db` in the project directory. Thi
 
 ## Security Notes
 
-- This application is designed for local network use only
-- Do not expose directly to the internet without proper security measures
-- Consider adding authentication if deploying in a shared network environment
+- This application includes built-in authentication for secure access
+- Designed for local network use only
+- **Do not expose directly to the internet** without additional security measures:
+  - Use a VPN for remote access
+  - Set up a reverse proxy with HTTPS (nginx, Caddy)
+  - Configure firewall rules appropriately
+- Change the default JWT_SECRET to a secure random string
+- Use strong passwords for your admin account
+- The database contains hashed passwords and is stored locally
 
 ## License
 

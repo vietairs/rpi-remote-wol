@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface Device {
   id: number;
@@ -19,6 +20,7 @@ interface DeviceStatus {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [status, setStatus] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [macAddress, setMacAddress] = useState<string>('');
@@ -28,17 +30,41 @@ export default function Home() {
   const [showSaveForm, setShowSaveForm] = useState<boolean>(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
   const [deviceStatuses, setDeviceStatuses] = useState<Map<number, DeviceStatus>>(new Map());
+  const [currentUser, setCurrentUser] = useState<string>('');
   const statusCheckInterval = useRef<NodeJS.Timeout | null>(null);
   const wakeMonitorTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Load saved devices on mount
   useEffect(() => {
     loadDevices();
+    checkSession();
     return () => {
       if (statusCheckInterval.current) clearInterval(statusCheckInterval.current);
       if (wakeMonitorTimeout.current) clearTimeout(wakeMonitorTimeout.current);
     };
   }, []);
+
+  const checkSession = async () => {
+    try {
+      const response = await fetch('/api/auth/session');
+      const data = await response.json();
+      if (data.authenticated && data.user) {
+        setCurrentUser(data.user.username);
+      }
+    } catch (error) {
+      console.error('Failed to check session:', error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/login');
+      router.refresh();
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   // Start periodic status checks
   useEffect(() => {
@@ -387,11 +413,27 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 flex items-center justify-center p-4">
       <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8 w-full max-w-4xl border border-white/20">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">
-            PC Remote Wake
-          </h1>
-          <p className="text-blue-200">Wake your Windows 11 PC remotely</p>
+        <div className="flex justify-between items-center mb-8">
+          <div className="text-center flex-1">
+            <h1 className="text-4xl font-bold text-white mb-2">
+              PC Remote Wake
+            </h1>
+            <p className="text-blue-200">Wake your Windows 11 PC remotely</p>
+          </div>
+          <div className="flex items-center gap-4">
+            {currentUser && (
+              <span className="text-blue-200 text-sm">
+                {currentUser}
+              </span>
+            )}
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-200 hover:text-red-100 border border-red-500/50 rounded-lg transition-colors text-sm font-medium"
+              title="Logout"
+            >
+              Logout
+            </button>
+          </div>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">

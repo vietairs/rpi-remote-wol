@@ -17,6 +17,18 @@ export interface DeviceInput {
   ip_address?: string;
 }
 
+export interface User {
+  id: number;
+  username: string;
+  password_hash: string;
+  created_at: string;
+}
+
+export interface UserInput {
+  username: string;
+  password_hash: string;
+}
+
 let db: Database.Database | null = null;
 
 // Lazy initialization function
@@ -48,7 +60,14 @@ function getDb(): Database.Database {
         ip_address TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
+      );
+
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     // Migration: Add ip_address column if it doesn't exist
@@ -127,6 +146,46 @@ export const deviceDb = {
     const stmt = database.prepare('DELETE FROM devices WHERE id = ?');
     const result = stmt.run(id);
     return result.changes > 0;
+  },
+};
+
+// User database operations
+export const userDb = {
+  getAll: (): User[] => {
+    const database = getDb();
+    const stmt = database.prepare('SELECT * FROM users');
+    return stmt.all() as User[];
+  },
+
+  getById: (id: number): User | undefined => {
+    const database = getDb();
+    const stmt = database.prepare('SELECT * FROM users WHERE id = ?');
+    return stmt.get(id) as User | undefined;
+  },
+
+  getByUsername: (username: string): User | undefined => {
+    const database = getDb();
+    const stmt = database.prepare('SELECT * FROM users WHERE username = ?');
+    return stmt.get(username) as User | undefined;
+  },
+
+  create: (user: UserInput): User => {
+    const database = getDb();
+    const insertStmt = database.prepare(`
+      INSERT INTO users (username, password_hash)
+      VALUES (@username, @password_hash)
+    `);
+    const result = insertStmt.run(user);
+
+    const getStmt = database.prepare('SELECT * FROM users WHERE id = ?');
+    return getStmt.get(result.lastInsertRowid) as User;
+  },
+
+  count: (): number => {
+    const database = getDb();
+    const stmt = database.prepare('SELECT COUNT(*) as count FROM users');
+    const result = stmt.get() as { count: number };
+    return result.count;
   },
 };
 
