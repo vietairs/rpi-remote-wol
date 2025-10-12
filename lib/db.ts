@@ -2,31 +2,6 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
-const dbDir = path.join(process.cwd(), 'data');
-const dbPath = path.join(dbDir, 'devices.db');
-
-// Ensure data directory exists
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
-}
-
-// Initialize database
-const db = new Database(dbPath);
-
-// Enable WAL mode for better concurrency
-db.pragma('journal_mode = WAL');
-
-// Create tables
-db.exec(`
-  CREATE TABLE IF NOT EXISTS devices (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    mac_address TEXT NOT NULL UNIQUE,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`);
-
 export interface Device {
   id: number;
   name: string;
@@ -40,48 +15,102 @@ export interface DeviceInput {
   mac_address: string;
 }
 
-// Prepared statements
-const getAllDevices = db.prepare('SELECT * FROM devices ORDER BY name ASC');
+let db: Database.Database | null = null;
 
-const getDeviceById = db.prepare('SELECT * FROM devices WHERE id = ?');
+// Lazy initialization function
+function getDb(): Database.Database {
+  if (!db) {
+    const dbDir = path.join(process.cwd(), 'data');
+    const dbPath = path.join(dbDir, 'devices.db');
 
-const getDeviceByMac = db.prepare('SELECT * FROM devices WHERE mac_address = ?');
+    // Ensure data directory exists
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+    }
 
-const insertDevice = db.prepare(`
-  INSERT INTO devices (name, mac_address)
-  VALUES (@name, @mac_address)
-`);
+    // Initialize database with timeout
+    db = new Database(dbPath, {
+      timeout: 5000,
+    });
 
-const updateDevice = db.prepare(`
-  UPDATE devices
-  SET name = @name, mac_address = @mac_address, updated_at = CURRENT_TIMESTAMP
-  WHERE id = @id
-`);
+    // Enable WAL mode for better concurrency
+    db.pragma('journal_mode = WAL');
+    db.pragma('busy_timeout = 5000');
 
-const deleteDevice = db.prepare('DELETE FROM devices WHERE id = ?');
+    // Create tables
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS devices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        mac_address TEXT NOT NULL UNIQUE,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  }
 
-// Export database operations
+  return db;
+}
+
+// Export database operations with lazy initialization
 export const deviceDb = {
-  getAll: () => getAllDevices.all() as Device[],
+  getAll: (): Device[] => {
+    const database = getDb();
+    const stmt = database.prepare('SELECT * FROM devices ORDER BY name ASC');
+    return stmt.all() as Device[];
+  },
 
-  getById: (id: number) => getDeviceById.get(id) as Device | undefined,
+  getById: (id: number): Device | undefined => {
+    const database = getDb();
+    const stmt = database.prepare('SELECT * FROM devices WHERE id = ?');
+    return stmt.get(id) as Device | undefined;
+  },
 
-  getByMac: (macAddress: string) => getDeviceByMac.get(macAddress) as Device | undefined,
+  getByMac: (macAddress: string): Device | undefined => {
+    const database = getDb();
+    const stmt = database.prepare('SELECT * FROM devices WHERE mac_address = ?');
+    return stmt.get(macAddress) as Device | undefined;
+  },
 
   create: (device: DeviceInput): Device => {
-    const result = insertDevice.run(device);
-    return getDeviceById.get(result.lastInsertRowid) as Device;
+    const database = getDb();
+    const insertStmt = database.prepare(`
+      INSERT INTO devices (name, mac_address)
+      VALUES (@name, @mac_address)
+    `);
+    const result = insertStmt.run(device);
+
+    const getStmt = database.prepare('SELECT * FROM devices WHERE id = ?');
+    return getStmt.get(result.lastInsertRowid) as Device;
   },
 
   update: (id: number, device: DeviceInput): Device | undefined => {
-    updateDevice.run({ id, ...device });
-    return getDeviceById.get(id) as Device | undefined;
+    const database = getDb();
+    const updateStmt = database.prepare(`
+      UPDATE devices
+      SET name = @name, mac_address = @mac_address, updated_at = CURRENT_TIMESTAMP
+      WHERE id = @id
+    `);
+    updateStmt.run({ id, ...device });
+
+    const getStmt = database.prepare('SELECT * FROM devices WHERE id = ?');
+    return getStmt.get(id) as Device | undefined;
   },
 
   delete: (id: number): boolean => {
-    const result = deleteDevice.run(id);
+    const database = getDb();
+    const stmt = database.prepare('DELETE FROM devices WHERE id = ?');
+    const result = stmt.run(id);
     return result.changes > 0;
   },
 };
 
-export default db;
+// Export close function for cleanup
+export function closeDb(): void {
+  if (db) {
+    db.close();
+    db = null;
+  }
+}
+
+export default getDb;
