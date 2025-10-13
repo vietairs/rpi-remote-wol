@@ -7,6 +7,8 @@ export interface Device {
   name: string;
   mac_address: string;
   ip_address: string | null;
+  ssh_username: string | null;
+  ssh_password: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -15,6 +17,8 @@ export interface DeviceInput {
   name: string;
   mac_address: string;
   ip_address?: string;
+  ssh_username?: string;
+  ssh_password?: string;
 }
 
 export interface User {
@@ -74,9 +78,17 @@ function getDb(): Database.Database {
     try {
       const columns = db.pragma('table_info(devices)') as Array<{ name: string }>;
       const hasIpAddress = columns.some(col => col.name === 'ip_address');
+      const hasSshUsername = columns.some(col => col.name === 'ssh_username');
+      const hasSshPassword = columns.some(col => col.name === 'ssh_password');
 
       if (!hasIpAddress) {
         db.exec('ALTER TABLE devices ADD COLUMN ip_address TEXT');
+      }
+      if (!hasSshUsername) {
+        db.exec('ALTER TABLE devices ADD COLUMN ssh_username TEXT');
+      }
+      if (!hasSshPassword) {
+        db.exec('ALTER TABLE devices ADD COLUMN ssh_password TEXT');
       }
     } catch (error) {
       // Column might already exist or table doesn't exist yet
@@ -110,13 +122,15 @@ export const deviceDb = {
   create: (device: DeviceInput): Device => {
     const database = getDb();
     const insertStmt = database.prepare(`
-      INSERT INTO devices (name, mac_address, ip_address)
-      VALUES (@name, @mac_address, @ip_address)
+      INSERT INTO devices (name, mac_address, ip_address, ssh_username, ssh_password)
+      VALUES (@name, @mac_address, @ip_address, @ssh_username, @ssh_password)
     `);
     const result = insertStmt.run({
       name: device.name,
       mac_address: device.mac_address,
       ip_address: device.ip_address || null,
+      ssh_username: device.ssh_username || null,
+      ssh_password: device.ssh_password || null,
     });
 
     const getStmt = database.prepare('SELECT * FROM devices WHERE id = ?');
@@ -127,7 +141,8 @@ export const deviceDb = {
     const database = getDb();
     const updateStmt = database.prepare(`
       UPDATE devices
-      SET name = @name, mac_address = @mac_address, ip_address = @ip_address, updated_at = CURRENT_TIMESTAMP
+      SET name = @name, mac_address = @mac_address, ip_address = @ip_address,
+          ssh_username = @ssh_username, ssh_password = @ssh_password, updated_at = CURRENT_TIMESTAMP
       WHERE id = @id
     `);
     updateStmt.run({
@@ -135,6 +150,8 @@ export const deviceDb = {
       name: device.name,
       mac_address: device.mac_address,
       ip_address: device.ip_address || null,
+      ssh_username: device.ssh_username || null,
+      ssh_password: device.ssh_password || null,
     });
 
     const getStmt = database.prepare('SELECT * FROM devices WHERE id = ?');

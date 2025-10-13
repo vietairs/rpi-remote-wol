@@ -8,6 +8,8 @@ interface Device {
   name: string;
   mac_address: string;
   ip_address: string | null;
+  ssh_username: string | null;
+  ssh_password: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -26,6 +28,8 @@ export default function Home() {
   const [macAddress, setMacAddress] = useState<string>('');
   const [ipAddress, setIpAddress] = useState<string>('');
   const [deviceName, setDeviceName] = useState<string>('');
+  const [sshUsername, setSshUsername] = useState<string>('');
+  const [sshPassword, setSshPassword] = useState<string>('');
   const [savedDevices, setSavedDevices] = useState<Device[]>([]);
   const [showSaveForm, setShowSaveForm] = useState<boolean>(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
@@ -288,6 +292,8 @@ export default function Home() {
           name: deviceName,
           macAddress,
           ipAddress: ipAddress || undefined,
+          sshUsername: sshUsername || undefined,
+          sshPassword: sshPassword || undefined,
         }),
       });
 
@@ -297,6 +303,8 @@ export default function Home() {
         setStatus(`Device "${deviceName}" saved successfully!`);
         setDeviceName('');
         setIpAddress('');
+        setSshUsername('');
+        setSshPassword('');
         setShowSaveForm(false);
         await loadDevices();
       } else {
@@ -346,6 +354,86 @@ export default function Home() {
     setIpAddress(device.ip_address || '');
     setSelectedDeviceId(device.id);
     setStatus(`Selected: ${device.name}`);
+  };
+
+  const handleShutdown = async (deviceId: number) => {
+    const device = savedDevices.find(d => d.id === deviceId);
+    if (!device) return;
+
+    if (!device.ssh_username || !device.ssh_password) {
+      setStatus('SSH credentials not configured for this device. Please edit and add SSH credentials.');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to shutdown ${device.name}?`)) {
+      return;
+    }
+
+    setLoading(true);
+    setStatus(`Sending shutdown command to ${device.name}...`);
+
+    try {
+      const response = await fetch('/api/shutdown', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ deviceId }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setStatus(`Success! Shutdown command sent to ${device.name}`);
+      } else {
+        setStatus(`Error: ${data.error}${data.details ? ' - ' + data.details : ''}`);
+      }
+    } catch (error) {
+      setStatus('Failed to send shutdown command');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSleep = async (deviceId: number) => {
+    const device = savedDevices.find(d => d.id === deviceId);
+    if (!device) return;
+
+    if (!device.ssh_username || !device.ssh_password) {
+      setStatus('SSH credentials not configured for this device. Please edit and add SSH credentials.');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to sleep ${device.name}?`)) {
+      return;
+    }
+
+    setLoading(true);
+    setStatus(`Sending sleep command to ${device.name}...`);
+
+    try {
+      const response = await fetch('/api/sleep', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ deviceId }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setStatus(`Success! Sleep command sent to ${device.name}`);
+      } else {
+        setStatus(`Error: ${data.error}${data.details ? ' - ' + data.details : ''}`);
+      }
+    } catch (error) {
+      setStatus('Failed to send sleep command');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getStatusBadge = (device: Device) => {
@@ -529,6 +617,28 @@ export default function Home() {
                     IP address enables status monitoring. Click Find IP to auto-discover.
                   </p>
                 </div>
+                <div className="space-y-2 pt-2 border-t border-white/10">
+                  <p className="text-xs text-blue-200 font-medium">
+                    SSH Credentials (for Shutdown/Sleep)
+                  </p>
+                  <input
+                    type="text"
+                    value={sshUsername}
+                    onChange={(e) => setSshUsername(e.target.value)}
+                    placeholder="SSH Username (optional)"
+                    className="w-full px-4 py-2 bg-white/10 border border-white/30 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                  <input
+                    type="password"
+                    value={sshPassword}
+                    onChange={(e) => setSshPassword(e.target.value)}
+                    placeholder="SSH Password (optional)"
+                    className="w-full px-4 py-2 bg-white/10 border border-white/30 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                  <p className="text-xs text-blue-200">
+                    Required for remote shutdown/sleep. Ensure OpenSSH server is enabled on Windows.
+                  </p>
+                </div>
                 <div className="flex gap-2">
                   <button
                     onClick={handleSaveDevice}
@@ -541,6 +651,8 @@ export default function Home() {
                       setShowSaveForm(false);
                       setDeviceName('');
                       setIpAddress('');
+                      setSshUsername('');
+                      setSshPassword('');
                     }}
                     className="flex-1 bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
                   >
@@ -610,6 +722,26 @@ export default function Home() {
                         </svg>
                       </button>
                     </div>
+                    {device.ssh_username && device.ssh_password && deviceStatuses.get(device.id)?.online && (
+                      <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => handleSleep(device.id)}
+                          disabled={loading}
+                          className="flex-1 px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 disabled:bg-gray-500/20 border border-yellow-500/50 text-yellow-100 text-xs font-medium rounded transition-colors disabled:cursor-not-allowed"
+                          title="Put device to sleep"
+                        >
+                          💤 Sleep
+                        </button>
+                        <button
+                          onClick={() => handleShutdown(device.id)}
+                          disabled={loading}
+                          className="flex-1 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 disabled:bg-gray-500/20 border border-red-500/50 text-red-100 text-xs font-medium rounded transition-colors disabled:cursor-not-allowed"
+                          title="Shutdown device"
+                        >
+                          🔴 Shutdown
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))
               )}

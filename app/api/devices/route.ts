@@ -19,7 +19,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, macAddress, ipAddress } = body;
+    const { name, macAddress, ipAddress, sshUsername, sshPassword } = body;
 
     if (!name || !macAddress) {
       return NextResponse.json(
@@ -61,6 +61,8 @@ export async function POST(request: NextRequest) {
       name,
       mac_address: macAddress,
       ip_address: ipAddress,
+      ssh_username: sshUsername,
+      ssh_password: sshPassword,
     };
 
     const device = deviceDb.create(deviceInput);
