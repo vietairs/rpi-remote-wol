@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession, generateApiKey, hashApiKey } from '@/lib/auth';
 import { apiKeyDb } from '@/lib/db';
 
+export const runtime = 'nodejs';
+
 // POST /api/keys - Generate new API key
 export async function POST(request: NextRequest) {
   try {

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { userDb } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
 
+export const runtime = 'nodejs';
+
 export async function POST(request: NextRequest) {
   try {
     // Check if any users exist

@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { apiKeyDb } from '@/lib/db';
 
+export const runtime = 'nodejs';
+
 // DELETE /api/keys/[id] - Revoke an API key
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession();
@@ -13,7 +15,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const keyId = parseInt(params.id, 10);
+    const { id } = await params;
+    const keyId = parseInt(id, 10);
     if (isNaN(keyId)) {
       return NextResponse.json(
         { error: 'Invalid API key ID' },

@@ -1,11 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { deviceDb } from '@/lib/db';
+import { verifyApiKeyHeader, getSession } from '@/lib/auth';
+
+export const runtime = 'nodejs';
 
 // DELETE /api/devices/[id] - Delete a device
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Check API key authentication first
+  const apiKeyUserId = await verifyApiKeyHeader(request);
+
+  if (!apiKeyUserId) {
+    // No valid API key, check session cookie
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  }
+
   try {
     const { id } = await params;
     const deviceId = parseInt(id, 10);

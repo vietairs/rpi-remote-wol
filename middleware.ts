@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { verifySession, verifyApiKey } from './lib/auth';
-import { apiKeyDb } from './lib/db';
+import { verifySession } from './lib/auth';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -14,36 +13,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // NEW: Check for Bearer token (API key authentication)
-  const authHeader = request.headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ')) {
-    const apiKey = authHeader.substring(7); // Remove "Bearer " prefix
+  // NOTE: API key authentication is now handled in individual API routes
+  // This middleware only handles JWT cookie authentication for web UI
 
-    // Try to find and verify the API key
-    try {
-      // Note: We need to check against all hashed keys since we can't reverse the hash
-      // This is less efficient but secure. For better performance, consider caching.
-      const allKeys = apiKeyDb.getAll();
-
-      for (const keyRecord of allKeys) {
-        const isValid = await verifyApiKey(apiKey, keyRecord.key_hash);
-        if (isValid) {
-          // Valid API key found - update last used timestamp
-          apiKeyDb.updateLastUsed(keyRecord.key_hash);
-          console.log('[Middleware] API key authenticated:', keyRecord.name);
-          return NextResponse.next();
-        }
-      }
-
-      // No matching API key found - fall through to cookie auth
-      console.log('[Middleware] Invalid API key, trying cookie auth');
-    } catch (error) {
-      console.error('[Middleware] API key verification error:', error);
-      // Fall through to cookie auth on error
-    }
+  // If this is an API route with Bearer token, let the route handle authentication
+  if (pathname.startsWith('/api/') && request.headers.get('authorization')?.startsWith('Bearer ')) {
+    console.log('[Middleware] API route with Bearer token - letting route handle auth');
+    return NextResponse.next();
   }
 
-  // EXISTING: JWT cookie authentication (unchanged)
+  // JWT cookie authentication for web UI
   const token = request.cookies.get('session')?.value;
 
   console.log('[Middleware]', pathname, 'Token:', token ? 'exists' : 'missing');
@@ -80,7 +59,8 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public files (public folder)
+     * - api routes (handled by route handlers)
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

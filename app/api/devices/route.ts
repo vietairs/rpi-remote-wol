@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { deviceDb, DeviceInput } from '@/lib/db';
+import { verifyApiKeyHeader, getSession } from '@/lib/auth';
+
+export const runtime = 'nodejs';
 
 // GET /api/devices - Get all saved devices
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Check API key authentication first
+  const apiKeyUserId = await verifyApiKeyHeader(request);
+
+  if (!apiKeyUserId) {
+    // No valid API key, check session cookie
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  }
+
   try {
     const devices = deviceDb.getAll();
     return NextResponse.json({ devices });
@@ -17,6 +31,17 @@ export async function GET() {
 
 // POST /api/devices - Create a new device
 export async function POST(request: NextRequest) {
+  // Check API key authentication first
+  const apiKeyUserId = await verifyApiKeyHeader(request);
+
+  if (!apiKeyUserId) {
+    // No valid API key, check session cookie
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  }
+
   try {
     const body = await request.json();
     const { name, macAddress, ipAddress, sshUsername, sshPassword } = body;

@@ -104,3 +104,40 @@ export async function verifyApiKey(
 ): Promise<boolean> {
   return bcrypt.compare(apiKey, hashedKey);
 }
+
+/**
+ * Verify API key from Authorization header (for API routes)
+ * This runs in Node.js runtime (API routes), not Edge Runtime (middleware)
+ * Returns userId if valid, null if invalid
+ */
+export async function verifyApiKeyHeader(request: Request): Promise<number | null> {
+  const authHeader = request.headers.get('authorization');
+
+  if (!authHeader?.startsWith('Bearer ')) {
+    return null;
+  }
+
+  const apiKey = authHeader.substring(7); // Remove "Bearer " prefix
+
+  try {
+    // Import here to avoid Edge Runtime issues if accidentally imported in middleware
+    const { apiKeyDb } = await import('./db');
+
+    // Check all API keys (need to verify hash)
+    const allKeys = apiKeyDb.getAll();
+
+    for (const keyRecord of allKeys) {
+      const isValid = await verifyApiKey(apiKey, keyRecord.key_hash);
+      if (isValid) {
+        // Valid API key found - update last used timestamp
+        apiKeyDb.updateLastUsed(keyRecord.key_hash);
+        return keyRecord.created_by; // Return userId
+      }
+    }
+
+    return null; // No valid API key found
+  } catch (error) {
+    console.error('[Auth] API key verification error:', error);
+    return null;
+  }
+}

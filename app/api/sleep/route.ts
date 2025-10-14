@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { NodeSSH } from 'node-ssh';
 import { deviceDb } from '@/lib/db';
+import { verifyApiKeyHeader, getSession } from '@/lib/auth';
+
+export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
+  // Check API key authentication first
+  const apiKeyUserId = await verifyApiKeyHeader(request);
+
+  if (!apiKeyUserId) {
+    // No valid API key, check session cookie
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  }
+
   try {
     const body = await request.json();
     const { deviceId } = body;
