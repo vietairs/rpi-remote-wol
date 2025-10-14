@@ -21,6 +21,17 @@ npm start            # Start production server
 npm run lint         # Run ESLint
 ```
 
+### Testing
+```bash
+npm test             # Run Playwright E2E tests
+npm run test:ui      # Run tests with Playwright UI
+npm run test:headed  # Run tests in headed browser
+npm run test:debug   # Run tests in debug mode
+npm run test:report  # View last test report
+```
+
+Tests are located in `tests/e2e/` and run sequentially with a single worker for database consistency.
+
 ### Environment Setup
 ```bash
 # Generate JWT secret
@@ -34,6 +45,7 @@ JWT_SECRET=<generated-secret>
 SQLite database is auto-created at `data/devices.db` on first run. Contains:
 - `users` table (username, password_hash)
 - `devices` table (name, mac_address, ip_address, ssh_username, ssh_password)
+- `api_keys` table (key_hash, name, created_by, last_used_at)
 
 ## Architecture
 
@@ -41,7 +53,8 @@ SQLite database is auto-created at `data/devices.db` on first run. Contains:
 - **Framework**: Next.js 15 with App Router (React 19)
 - **Styling**: Tailwind CSS v4
 - **Database**: SQLite via better-sqlite3 with WAL mode
-- **Authentication**: JWT with jose library, bcryptjs password hashing
+- **Authentication**: Dual auth system - JWT cookies (web UI) + API keys (programmatic access)
+- **Testing**: Playwright for E2E tests with sequential execution
 - **Network**: wake_on_lan for WOL, node-ssh for remote commands, tcp-ping for status checks
 
 ### Key Directories
@@ -50,6 +63,7 @@ app/
 ├── api/              # API route handlers
 │   ├── auth/        # Authentication endpoints (login, logout, session, init)
 │   ├── devices/     # Device CRUD operations
+│   ├── keys/        # API key management (create, list, delete)
 │   ├── wake/        # Wake-on-LAN endpoint
 │   ├── shutdown/    # SSH shutdown endpoint
 │   ├── sleep/       # SSH sleep endpoint
@@ -60,10 +74,15 @@ app/
 └── page.tsx         # Main dashboard
 
 lib/
-├── db.ts            # Database layer (deviceDb, userDb)
-└── auth.ts          # Auth utilities (JWT, bcrypt, session management)
+├── db.ts            # Database layer (deviceDb, userDb, apiKeyDb)
+└── auth.ts          # Auth utilities (JWT, bcrypt, API keys, session management)
 
-middleware.ts         # Route protection (JWT verification)
+tests/
+├── e2e/             # Playwright E2E tests
+├── fixtures/        # Test fixtures and helpers
+└── mocks/           # Mock implementations
+
+middleware.ts         # Dual auth: JWT cookies + API key Bearer tokens
 ```
 
 ### Core Components
@@ -72,21 +91,32 @@ middleware.ts         # Route protection (JWT verification)
 - Lazy initialization pattern with singleton instance
 - WAL mode enabled for better concurrency
 - Automatic schema migrations (adds columns if missing)
-- Separate namespaces: `deviceDb` and `userDb`
+- Three separate namespaces: `deviceDb`, `userDb`, and `apiKeyDb`
 - Uses prepared statements for all queries
+- Foreign key constraints enabled (api_keys → users)
 
 #### Authentication ([lib/auth.ts](lib/auth.ts))
-- JWT tokens with 7-day expiration
-- HTTP-only cookies with `sameSite: 'lax'`
-- `secure: false` (designed for local network, change for HTTPS)
-- Bcrypt with 10 rounds for password hashing
-- Session data: `{ userId, username, exp }`
+**Dual Authentication System**:
+1. **JWT Cookie Auth** (Web UI):
+   - JWT tokens with 7-day expiration
+   - HTTP-only cookies with `sameSite: 'lax'`
+   - `secure: false` (designed for local network, change for HTTPS)
+   - Session data: `{ userId, username, exp }`
+
+2. **API Key Auth** (Programmatic Access):
+   - Bearer token format: `Authorization: Bearer pcw_xxx`
+   - bcrypt-hashed keys stored in database
+   - Per-key name and last_used tracking
+   - Suitable for Homebridge, automation, external integrations
 
 #### Middleware ([middleware.ts](middleware.ts))
 - Protects all routes except `/login`, `/setup`, `/api/auth/*`
-- JWT verification on every request
-- Redirects to `/login` for invalid/missing tokens
+- **Dual Authentication Flow**:
+  - API routes with `Authorization: Bearer` header → passed to route handler for API key validation
+  - All other routes → JWT cookie verification
+- Redirects to `/login` for invalid/missing JWT tokens
 - Excludes static assets and images
+- Individual API routes handle API key authentication via `verifyApiKey()`
 
 #### API Routes
 
@@ -109,8 +139,16 @@ middleware.ts         # Route protection (JWT verification)
 - Sleep: `rundll32.exe powrprof.dll,SetSuspendState 0,1,0`
 - Automatically disposes SSH connection
 
+**API Key Management** ([app/api/keys/route.ts](app/api/keys/route.ts)):
+- `GET /api/keys` - List all API keys for current user (excludes key_hash)
+- `POST /api/keys` - Generate new API key with custom name
+- `DELETE /api/keys/[id]` - Revoke specific API key
+- Returns plaintext key only once during creation (bcrypt-hashed storage)
+- Keys prefixed with `pcw_` for easy identification
+
 ### Authentication Flow
 
+#### Web UI (JWT Cookie)
 1. **First Launch**:
    - No users exist → redirect to `/setup`
    - Admin creates account → redirect to `/login`
@@ -124,6 +162,22 @@ middleware.ts         # Route protection (JWT verification)
    - Middleware checks JWT on every protected route
    - 7-day token expiration
    - Cookie cleared on logout or invalid token
+
+#### Programmatic Access (API Key)
+1. **Key Creation**:
+   - User generates API key via web UI: POST `/api/keys` with `{ name }`
+   - Plaintext key returned once: `pcw_xxxxxxxxxxxxx`
+   - bcrypt hash stored in database
+
+2. **API Usage**:
+   - Include header: `Authorization: Bearer pcw_xxxxxxxxxxxxx`
+   - Middleware passes Bearer requests to route handlers
+   - Routes call `verifyApiKey()` to validate and track usage
+   - `last_used_at` timestamp updated on each use
+
+3. **Key Management**:
+   - List keys: GET `/api/keys` (shows name, created_at, last_used_at)
+   - Revoke: DELETE `/api/keys/[id]`
 
 ### Device Management Flow
 
@@ -154,10 +208,22 @@ deviceDb.create({ name, mac_address, ip_address });
 
 ### Authentication Checks
 ```typescript
-// In API routes
+// JWT Cookie Auth (Web UI routes)
 import { getSession } from '@/lib/auth';
 const session = await getSession();
 if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+// API Key Auth (Programmatic access)
+import { verifyApiKey } from '@/lib/auth';
+const apiKeyAuth = await verifyApiKey(request);
+if (!apiKeyAuth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+// Dual Auth Support (accept either)
+const session = await getSession();
+const apiKeyAuth = !session ? await verifyApiKey(request) : null;
+if (!session && !apiKeyAuth) {
+  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+}
 ```
 
 ### Error Handling
@@ -172,22 +238,75 @@ return NextResponse.json(
 ## Security Considerations
 
 - JWT_SECRET must be set in production (use `openssl rand -base64 32`)
+- API keys are bcrypt-hashed (10 rounds) before storage
 - SSH credentials stored in plaintext in SQLite (local network only)
 - Cookies use `secure: false` for local network (change for HTTPS)
 - Designed for LAN use only - do not expose directly to internet
 - No rate limiting implemented (add if needed for production)
 - Middleware protects all routes except public paths
+- API keys suitable for Homebridge integration (no cookie support needed)
 
-## Testing Notes
+## Testing Strategy
 
-- No test suite currently exists
-- Manual testing workflow:
-  1. Test first-time setup flow
-  2. Test login/logout
-  3. Test device CRUD operations
-  4. Test WOL with real device on network
-  5. Test status monitoring
-  6. Test SSH commands (requires OpenSSH on Windows)
+### E2E Tests (Playwright)
+Located in `tests/e2e/`, covering:
+- **Authentication**: Setup flow, login/logout, session management, API key creation/validation
+- **Device Management**: CRUD operations, validation, duplicate detection
+- **Wake-on-LAN**: Magic packet sending (mocked network)
+- **Status Monitoring**: Online/offline detection via TCP ping
+- **API Integration**: Homebridge-compatible API key authentication
+
+**Test Execution**:
+- Sequential execution (single worker) for database consistency
+- Automatic dev server startup via `webServer` config
+- Test database isolation in `tests/fixtures/`
+- Mock network operations where needed (WOL, SSH)
+
+**Coverage Areas**:
+- ✅ User authentication flows (setup, login, logout)
+- ✅ API key lifecycle (create, list, delete, authenticate)
+- ✅ Device CRUD operations
+- ✅ Dual authentication (JWT + API keys)
+- ✅ Error handling and validation
+- ⚠️ SSH commands (mocked, requires real Windows PC for integration test)
+- ⚠️ Actual WOL (requires hardware on network)
+
+## API Integration (Homebridge Example)
+
+The application supports programmatic access via API keys, making it suitable for Homebridge plugins and automation:
+
+```javascript
+// Homebridge plugin example
+const API_KEY = 'pcw_xxxxxxxxxxxxx';
+const BASE_URL = 'http://localhost:3000';
+
+// Wake device
+await fetch(`${BASE_URL}/api/wake`, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${API_KEY}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({ macAddress: 'AA:BB:CC:DD:EE:FF' })
+});
+
+// Check device status
+const response = await fetch(`${BASE_URL}/api/status`, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${API_KEY}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({ ipAddress: '192.168.1.100' })
+});
+const { online, rdpReady } = await response.json();
+```
+
+**Key Benefits for Integration**:
+- No cookie management required
+- Stateless authentication
+- Per-integration key tracking (`last_used_at`)
+- Easy revocation without affecting other integrations
 
 ## Windows PC Requirements
 

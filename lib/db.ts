@@ -48,6 +48,36 @@ export interface ApiKeyInput {
   created_by: number;
 }
 
+export interface SystemMetrics {
+  id: number;
+  device_id: number;
+  cpu_percent: number | null;
+  ram_used_gb: number | null;
+  ram_total_gb: number | null;
+  ram_percent: number | null;
+  gpu_percent: number | null;
+  gpu_memory_used_mb: number | null;
+  gpu_memory_total_mb: number | null;
+  network_rx_mbps: number | null;
+  network_tx_mbps: number | null;
+  timestamp: number;
+  created_at: string;
+}
+
+export interface SystemMetricsInput {
+  device_id: number;
+  cpu_percent?: number;
+  ram_used_gb?: number;
+  ram_total_gb?: number;
+  ram_percent?: number;
+  gpu_percent?: number;
+  gpu_memory_used_mb?: number;
+  gpu_memory_total_mb?: number;
+  network_rx_mbps?: number;
+  network_tx_mbps?: number;
+  timestamp: number;
+}
+
 let db: Database.Database | null = null;
 
 // Lazy initialization function
@@ -99,6 +129,26 @@ function getDb(): Database.Database {
       );
 
       CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
+
+      CREATE TABLE IF NOT EXISTS system_metrics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        device_id INTEGER NOT NULL,
+        cpu_percent REAL,
+        ram_used_gb REAL,
+        ram_total_gb REAL,
+        ram_percent REAL,
+        gpu_percent REAL,
+        gpu_memory_used_mb INTEGER,
+        gpu_memory_total_mb INTEGER,
+        network_rx_mbps REAL,
+        network_tx_mbps REAL,
+        timestamp INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_metrics_device_time
+      ON system_metrics(device_id, timestamp DESC);
     `);
 
     // Migration: Add ip_address column if it doesn't exist
@@ -285,6 +335,79 @@ export const apiKeyDb = {
     const stmt = database.prepare('DELETE FROM api_keys WHERE id = ?');
     const result = stmt.run(id);
     return result.changes > 0;
+  },
+};
+
+// System metrics database operations
+export const metricsDb = {
+  create: (metrics: SystemMetricsInput): SystemMetrics => {
+    const database = getDb();
+    const insertStmt = database.prepare(`
+      INSERT INTO system_metrics (
+        device_id, cpu_percent, ram_used_gb, ram_total_gb, ram_percent,
+        gpu_percent, gpu_memory_used_mb, gpu_memory_total_mb,
+        network_rx_mbps, network_tx_mbps, timestamp
+      ) VALUES (
+        @device_id, @cpu_percent, @ram_used_gb, @ram_total_gb, @ram_percent,
+        @gpu_percent, @gpu_memory_used_mb, @gpu_memory_total_mb,
+        @network_rx_mbps, @network_tx_mbps, @timestamp
+      )
+    `);
+    const result = insertStmt.run({
+      device_id: metrics.device_id,
+      cpu_percent: metrics.cpu_percent ?? null,
+      ram_used_gb: metrics.ram_used_gb ?? null,
+      ram_total_gb: metrics.ram_total_gb ?? null,
+      ram_percent: metrics.ram_percent ?? null,
+      gpu_percent: metrics.gpu_percent ?? null,
+      gpu_memory_used_mb: metrics.gpu_memory_used_mb ?? null,
+      gpu_memory_total_mb: metrics.gpu_memory_total_mb ?? null,
+      network_rx_mbps: metrics.network_rx_mbps ?? null,
+      network_tx_mbps: metrics.network_tx_mbps ?? null,
+      timestamp: metrics.timestamp,
+    });
+
+    const getStmt = database.prepare('SELECT * FROM system_metrics WHERE id = ?');
+    return getStmt.get(result.lastInsertRowid) as SystemMetrics;
+  },
+
+  getLatestForDevice: (deviceId: number): SystemMetrics | undefined => {
+    const database = getDb();
+    const stmt = database.prepare(`
+      SELECT * FROM system_metrics
+      WHERE device_id = ?
+      ORDER BY timestamp DESC
+      LIMIT 1
+    `);
+    return stmt.get(deviceId) as SystemMetrics | undefined;
+  },
+
+  getHistoricalForDevice: (
+    deviceId: number,
+    startTimestamp: number,
+    endTimestamp: number
+  ): SystemMetrics[] => {
+    const database = getDb();
+    const stmt = database.prepare(`
+      SELECT * FROM system_metrics
+      WHERE device_id = ? AND timestamp >= ? AND timestamp <= ?
+      ORDER BY timestamp ASC
+    `);
+    return stmt.all(deviceId, startTimestamp, endTimestamp) as SystemMetrics[];
+  },
+
+  deleteOlderThan: (timestamp: number): number => {
+    const database = getDb();
+    const stmt = database.prepare('DELETE FROM system_metrics WHERE timestamp < ?');
+    const result = stmt.run(timestamp);
+    return result.changes;
+  },
+
+  countForDevice: (deviceId: number): number => {
+    const database = getDb();
+    const stmt = database.prepare('SELECT COUNT(*) as count FROM system_metrics WHERE device_id = ?');
+    const result = stmt.get(deviceId) as { count: number };
+    return result.count;
   },
 };
 
