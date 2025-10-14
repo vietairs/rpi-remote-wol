@@ -32,6 +32,8 @@ export default function Home() {
   const [sshPassword, setSshPassword] = useState<string>('');
   const [savedDevices, setSavedDevices] = useState<Device[]>([]);
   const [showSaveForm, setShowSaveForm] = useState<boolean>(false);
+  const [showEditForm, setShowEditForm] = useState<boolean>(false);
+  const [editingDeviceId, setEditingDeviceId] = useState<number | null>(null);
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
   const [deviceStatuses, setDeviceStatuses] = useState<Map<number, DeviceStatus>>(new Map());
   const [currentUser, setCurrentUser] = useState<string>('');
@@ -356,6 +358,60 @@ export default function Home() {
     setStatus(`Selected: ${device.name}`);
   };
 
+  const handleEditDevice = (device: Device) => {
+    setEditingDeviceId(device.id);
+    setDeviceName(device.name);
+    setMacAddress(device.mac_address);
+    setIpAddress(device.ip_address || '');
+    setSshUsername(device.ssh_username || '');
+    setSshPassword(device.ssh_password || '');
+    setShowEditForm(true);
+    setShowSaveForm(false);
+    setStatus(`Editing: ${device.name}`);
+  };
+
+  const handleUpdateDevice = async () => {
+    if (!editingDeviceId || !deviceName || !macAddress) {
+      setStatus('Please enter both device name and MAC address');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/devices/${editingDeviceId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: deviceName,
+          macAddress,
+          ipAddress: ipAddress || undefined,
+          sshUsername: sshUsername || undefined,
+          sshPassword: sshPassword || undefined,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setStatus(`Device "${deviceName}" updated successfully!`);
+        setDeviceName('');
+        setMacAddress('');
+        setIpAddress('');
+        setSshUsername('');
+        setSshPassword('');
+        setShowEditForm(false);
+        setEditingDeviceId(null);
+        await loadDevices();
+      } else {
+        setStatus(`Error: ${data.error}`);
+      }
+    } catch (error) {
+      setStatus('Failed to update device');
+      console.error(error);
+    }
+  };
+
   const handleShutdown = async (deviceId: number) => {
     const device = savedDevices.find(d => d.id === deviceId);
     if (!device) return;
@@ -580,13 +636,98 @@ export default function Home() {
               )}
             </button>
 
-            {!showSaveForm ? (
+            {!showSaveForm && !showEditForm ? (
               <button
                 onClick={() => setShowSaveForm(true)}
                 className="w-full bg-white/10 hover:bg-white/20 text-white font-medium py-3 px-6 rounded-lg border border-white/30 transition-colors"
               >
                 💾 Save This Device
               </button>
+            ) : showEditForm ? (
+              <div className="space-y-3 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-white font-medium">✏️ Edit Device</h3>
+                </div>
+                <input
+                  type="text"
+                  value={deviceName}
+                  onChange={(e) => setDeviceName(e.target.value)}
+                  placeholder="Device name (e.g., Gaming PC)"
+                  className="w-full px-4 py-2 bg-white/10 border border-white/30 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+                <input
+                  type="text"
+                  value={macAddress}
+                  onChange={(e) => setMacAddress(e.target.value)}
+                  placeholder="MAC Address"
+                  className="w-full px-4 py-2 bg-white/10 border border-white/30 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={ipAddress}
+                      onChange={(e) => setIpAddress(e.target.value)}
+                      placeholder="IP Address (optional)"
+                      className="flex-1 px-4 py-2 bg-white/10 border border-white/30 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                    <button
+                      onClick={handleDiscoverIp}
+                      className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors whitespace-nowrap"
+                      title="Auto-discover IP from MAC address"
+                    >
+                      🔍 Find IP
+                    </button>
+                  </div>
+                  <p className="text-xs text-blue-200">
+                    IP address enables status monitoring. Click Find IP to auto-discover.
+                  </p>
+                </div>
+                <div className="space-y-2 pt-2 border-t border-white/10">
+                  <p className="text-xs text-blue-200 font-medium">
+                    SSH Credentials (for Shutdown/Sleep)
+                  </p>
+                  <input
+                    type="text"
+                    value={sshUsername}
+                    onChange={(e) => setSshUsername(e.target.value)}
+                    placeholder="SSH Username (optional)"
+                    className="w-full px-4 py-2 bg-white/10 border border-white/30 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                  <input
+                    type="password"
+                    value={sshPassword}
+                    onChange={(e) => setSshPassword(e.target.value)}
+                    placeholder="SSH Password (optional)"
+                    className="w-full px-4 py-2 bg-white/10 border border-white/30 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                  <p className="text-xs text-blue-200">
+                    Required for remote shutdown/sleep. Ensure OpenSSH server is enabled on Windows.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleUpdateDevice}
+                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Update
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowEditForm(false);
+                      setEditingDeviceId(null);
+                      setDeviceName('');
+                      setMacAddress('');
+                      setIpAddress('');
+                      setSshUsername('');
+                      setSshPassword('');
+                    }}
+                    className="flex-1 bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             ) : (
               <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/20">
                 <input
@@ -699,28 +840,52 @@ export default function Home() {
                           </p>
                         )}
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteDevice(device.id);
-                        }}
-                        className="text-red-300 hover:text-red-100 transition-colors ml-2"
-                        title="Delete device"
-                      >
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
+                      <div className="flex gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditDevice(device);
+                          }}
+                          className="text-blue-300 hover:text-blue-100 transition-colors"
+                          title="Edit device"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                          />
-                        </svg>
-                      </button>
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                            />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteDevice(device.id);
+                          }}
+                          className="text-red-300 hover:text-red-100 transition-colors"
+                          title="Delete device"
+                        >
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                     {device.ssh_username && device.ssh_password && deviceStatuses.get(device.id)?.online && (
                       <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
