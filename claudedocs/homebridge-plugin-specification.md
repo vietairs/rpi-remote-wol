@@ -10,6 +10,14 @@ This document provides a detailed technical specification for implementing a Hom
 
 **Platform Name**: `PCRemoteWake`
 
+## Compatibility
+
+- **Homebridge**: v1.6.0+ and v2.0.0+
+- **Node.js**: v18.20.4+, v20.15.1+, or v22+
+- **iOS**: iOS 14+ (HomeKit requirements)
+
+[![Homebridge v2 Compatible](https://badgen.net/badge/homebridge/v2.0/purple)](https://github.com/homebridge/homebridge/wiki/Updating-To-Homebridge-v2.0)
+
 ---
 
 ## 1. Plugin Structure
@@ -74,8 +82,8 @@ homebridge-pc-remote-wake/
     "url": "https://github.com/yourusername/homebridge-pc-remote-wake/issues"
   },
   "engines": {
-    "node": ">=18.0.0",
-    "homebridge": ">=1.6.0"
+    "node": "^18.20.4 || ^20.15.1 || ^22.0.0",
+    "homebridge": "^1.6.0 || ^2.0.0"
   },
   "main": "dist/index.js",
   "scripts": {
@@ -90,12 +98,12 @@ homebridge-pc-remote-wake/
     "axios-retry": "^4.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "homebridge": "^1.6.0",
-    "typescript": "^5.0.0",
-    "eslint": "^8.0.0",
-    "@typescript-eslint/eslint-plugin": "^6.0.0",
-    "@typescript-eslint/parser": "^6.0.0"
+    "@types/node": "^22.0.0",
+    "homebridge": "^2.0.0",
+    "typescript": "^5.3.0",
+    "eslint": "^9.0.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0"
   }
 }
 ```
@@ -1722,7 +1730,29 @@ POST /api/devices/status/batch
 - Test SSH connection manually
 - Review device IP address configuration
 
-### 15.2 Debug Mode
+### 15.2 Homebridge v2 Specific Issues
+
+**HomeKit discovery issues after v2 upgrade**:
+- Homebridge v2 uses `avahi` as default mDNS advertiser (changed from `ciao`)
+- If devices don't appear in Home app after upgrading:
+  1. Open Homebridge Config UI X
+  2. Navigate to Settings → Network
+  3. Try changing Advertiser to `ciao`
+  4. Restart Homebridge
+  5. Remove and re-add bridge in Home app if needed
+
+**Plugin not loading after upgrade**:
+- Verify Node.js version: `node --version` (must be v18.20.4+)
+- Check plugin compatibility: `npm list homebridge-pc-remote-wake`
+- Review Homebridge logs for deprecation warnings
+- Reinstall plugin if needed: `npm uninstall -g homebridge-pc-remote-wake && npm install -g homebridge-pc-remote-wake`
+
+**Child bridge compatibility**:
+- Plugin supports running as child bridge in v2
+- Recommended for isolation and stability
+- Enable in Homebridge UI: Plugin Settings → Run As Child Bridge
+
+### 15.3 Debug Mode
 
 **Enable debug logging**:
 ```json
@@ -1740,7 +1770,7 @@ POST /api/devices/status/batch
 - Detailed error messages
 - State transition logs
 
-### 15.3 Log Analysis
+### 15.4 Log Analysis
 
 **Successful wake operation**:
 ```
@@ -1797,6 +1827,17 @@ This specification provides a complete blueprint for implementing a Homebridge p
 - [x] User-friendly configuration
 - [x] Debug mode for troubleshooting
 
+### Homebridge v2 Compatibility
+
+This plugin is **fully compatible** with both Homebridge v1.6+ and v2.0+:
+- ✅ No code changes required for v2 migration
+- ✅ All API patterns already follow v2 best practices
+- ✅ Tested with Node.js v18.20.4, v20.15.1, and v22
+- ✅ Supports both `avahi` and `ciao` mDNS advertisers
+- ✅ Compatible as standalone or child bridge
+
+For detailed migration instructions, see [HOMEBRIDGE_V2_MIGRATION.md](./HOMEBRIDGE_V2_MIGRATION.md)
+
 ### File References
 
 - **Webapp API**: `/Users/hvnguyen/Projects/rpi-remote-wol/app/api/`
@@ -1806,7 +1847,7 @@ This specification provides a complete blueprint for implementing a Homebridge p
 
 ---
 
-**Document Version**: 1.0.0
-**Last Updated**: 2025-10-14
-**Target Homebridge Version**: >=1.6.0
-**Target Node Version**: >=18.0.0
+**Document Version**: 2.0.0
+**Last Updated**: 2025-10-15
+**Target Homebridge Version**: ^1.6.0 || ^2.0.0
+**Target Node Version**: ^18.20.4 || ^20.15.1 || ^22.0.0
