@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Read(//home/hvnguyenn/**)"
+      "Read(//home/hvnguyenn/**)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []

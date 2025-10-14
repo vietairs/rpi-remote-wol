@@ -33,6 +33,21 @@ export interface UserInput {
   password_hash: string;
 }
 
+export interface ApiKey {
+  id: number;
+  key_hash: string;
+  name: string;
+  created_at: string;
+  last_used_at: string | null;
+  created_by: number;
+}
+
+export interface ApiKeyInput {
+  key_hash: string;
+  name: string;
+  created_by: number;
+}
+
 let db: Database.Database | null = null;
 
 // Lazy initialization function
@@ -72,6 +87,18 @@ function getDb(): Database.Database {
         password_hash TEXT NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS api_keys (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key_hash TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        last_used_at DATETIME,
+        created_by INTEGER NOT NULL,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
     `);
 
     // Migration: Add ip_address column if it doesn't exist
@@ -203,6 +230,61 @@ export const userDb = {
     const stmt = database.prepare('SELECT COUNT(*) as count FROM users');
     const result = stmt.get() as { count: number };
     return result.count;
+  },
+};
+
+// API Key database operations
+export const apiKeyDb = {
+  getAll: (): ApiKey[] => {
+    const database = getDb();
+    const stmt = database.prepare('SELECT * FROM api_keys ORDER BY created_at DESC');
+    return stmt.all() as ApiKey[];
+  },
+
+  getAllForUser: (userId: number): Omit<ApiKey, 'key_hash'>[] => {
+    const database = getDb();
+    const stmt = database.prepare(`
+      SELECT id, name, created_at, last_used_at, created_by
+      FROM api_keys
+      WHERE created_by = ?
+      ORDER BY created_at DESC
+    `);
+    return stmt.all(userId) as Omit<ApiKey, 'key_hash'>[];
+  },
+
+  getByHash: (keyHash: string): ApiKey | undefined => {
+    const database = getDb();
+    const stmt = database.prepare('SELECT * FROM api_keys WHERE key_hash = ?');
+    return stmt.get(keyHash) as ApiKey | undefined;
+  },
+
+  create: (apiKey: ApiKeyInput): ApiKey => {
+    const database = getDb();
+    const insertStmt = database.prepare(`
+      INSERT INTO api_keys (key_hash, name, created_by)
+      VALUES (@key_hash, @name, @created_by)
+    `);
+    const result = insertStmt.run(apiKey);
+
+    const getStmt = database.prepare('SELECT * FROM api_keys WHERE id = ?');
+    return getStmt.get(result.lastInsertRowid) as ApiKey;
+  },
+
+  updateLastUsed: (keyHash: string): void => {
+    const database = getDb();
+    const stmt = database.prepare(`
+      UPDATE api_keys
+      SET last_used_at = CURRENT_TIMESTAMP
+      WHERE key_hash = ?
+    `);
+    stmt.run(keyHash);
+  },
+
+  deleteById: (id: number): boolean => {
+    const database = getDb();
+    const stmt = database.prepare('DELETE FROM api_keys WHERE id = ?');
+    const result = stmt.run(id);
+    return result.changes > 0;
   },
 };
 

@@ -83,3 +83,24 @@ export async function clearSession(): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.delete('session');
 }
+
+// API Key functions
+export function generateApiKey(): string {
+  // Generate 32-byte random hex string (64 characters)
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+export async function hashApiKey(apiKey: string): Promise<string> {
+  return bcrypt.hash(apiKey, 10);
+}
+
+export async function verifyApiKey(
+  apiKey: string,
+  hashedKey: string
+): Promise<boolean> {
+  return bcrypt.compare(apiKey, hashedKey);
+}

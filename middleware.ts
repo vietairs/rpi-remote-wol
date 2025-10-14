@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { verifySession } from './lib/auth';
+import { verifySession, verifyApiKey } from './lib/auth';
+import { apiKeyDb } from './lib/db';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -13,7 +14,36 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Get session token from cookies
+  // NEW: Check for Bearer token (API key authentication)
+  const authHeader = request.headers.get('authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const apiKey = authHeader.substring(7); // Remove "Bearer " prefix
+
+    // Try to find and verify the API key
+    try {
+      // Note: We need to check against all hashed keys since we can't reverse the hash
+      // This is less efficient but secure. For better performance, consider caching.
+      const allKeys = apiKeyDb.getAll();
+
+      for (const keyRecord of allKeys) {
+        const isValid = await verifyApiKey(apiKey, keyRecord.key_hash);
+        if (isValid) {
+          // Valid API key found - update last used timestamp
+          apiKeyDb.updateLastUsed(keyRecord.key_hash);
+          console.log('[Middleware] API key authenticated:', keyRecord.name);
+          return NextResponse.next();
+        }
+      }
+
+      // No matching API key found - fall through to cookie auth
+      console.log('[Middleware] Invalid API key, trying cookie auth');
+    } catch (error) {
+      console.error('[Middleware] API key verification error:', error);
+      // Fall through to cookie auth on error
+    }
+  }
+
+  // EXISTING: JWT cookie authentication (unchanged)
   const token = request.cookies.get('session')?.value;
 
   console.log('[Middleware]', pathname, 'Token:', token ? 'exists' : 'missing');
