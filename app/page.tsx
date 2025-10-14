@@ -19,6 +19,7 @@ interface DeviceStatus {
   rdpReady: boolean;
   checking: boolean;
   waking: boolean;
+  sleeping?: boolean;
 }
 
 export default function Home() {
@@ -441,6 +442,29 @@ export default function Home() {
 
       if (response.ok) {
         setStatus(`Success! Shutdown command sent to ${device.name}`);
+
+        // Update device status immediately to offline
+        setDeviceStatuses(prev => new Map(prev.set(device.id, {
+          online: false,
+          rdpReady: false,
+          checking: false,
+          waking: false,
+          sleeping: false,
+        })));
+
+        // Pause status polling during shutdown transition
+        if (statusCheckInterval.current) {
+          clearInterval(statusCheckInterval.current);
+        }
+
+        // Resume polling after shutdown transition
+        setTimeout(() => {
+          checkAllDeviceStatuses();
+          statusCheckInterval.current = setInterval(() => {
+            checkAllDeviceStatuses();
+          }, 30000);
+        }, 10000); // 10-second shutdown transition period
+
       } else {
         setStatus(`Error: ${data.error}${data.details ? ' - ' + data.details : ''}`);
       }
@@ -481,6 +505,38 @@ export default function Home() {
 
       if (response.ok) {
         setStatus(`Success! Sleep command sent to ${device.name}`);
+
+        // Update device status to "sleeping" state
+        setDeviceStatuses(prev => new Map(prev.set(device.id, {
+          online: false,
+          rdpReady: false,
+          checking: false,
+          waking: false,
+          sleeping: true,
+        })));
+
+        // Pause status polling during sleep transition
+        if (statusCheckInterval.current) {
+          clearInterval(statusCheckInterval.current);
+        }
+
+        // Clear sleeping state and resume polling after transition period
+        setTimeout(() => {
+          setDeviceStatuses(prev => new Map(prev.set(device.id, {
+            online: false,
+            rdpReady: false,
+            checking: false,
+            waking: false,
+            sleeping: false,
+          })));
+
+          // Resume status checking
+          checkAllDeviceStatuses();
+          statusCheckInterval.current = setInterval(() => {
+            checkAllDeviceStatuses();
+          }, 30000);
+        }, 15000); // 15-second sleep transition period
+
       } else {
         setStatus(`Error: ${data.error}${data.details ? ' - ' + data.details : ''}`);
       }
@@ -511,6 +567,17 @@ export default function Home() {
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
           </svg>
           Checking
+        </span>
+      );
+    }
+
+    if (deviceStatus?.sleeping) {
+      return (
+        <span className="text-xs px-2 py-1 rounded bg-purple-500/20 text-purple-300 flex items-center gap-1 animate-pulse">
+          <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm0 10a2 2 0 110-4 2 2 0 010 4z" />
+          </svg>
+          Sleeping
         </span>
       );
     }
@@ -887,26 +954,45 @@ export default function Home() {
                         </button>
                       </div>
                     </div>
-                    {device.ssh_username && device.ssh_password && deviceStatuses.get(device.id)?.online && (
-                      <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
+                      {/* Show wake button when offline and has IP */}
+                      {device.ip_address && !deviceStatuses.get(device.id)?.online && (
                         <button
-                          onClick={() => handleSleep(device.id)}
-                          disabled={loading}
-                          className="flex-1 px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 disabled:bg-gray-500/20 border border-yellow-500/50 text-yellow-100 text-xs font-medium rounded transition-colors disabled:cursor-not-allowed"
-                          title="Put device to sleep"
+                          onClick={() => {
+                            setSelectedDeviceId(device.id);
+                            setMacAddress(device.mac_address);
+                            handleWake();
+                          }}
+                          disabled={loading || deviceStatuses.get(device.id)?.waking}
+                          className="flex-1 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 disabled:bg-gray-500/20 border border-blue-500/50 text-blue-100 text-xs font-medium rounded transition-colors disabled:cursor-not-allowed"
+                          title="Wake device"
                         >
-                          💤 Sleep
+                          ⚡ Wake
                         </button>
-                        <button
-                          onClick={() => handleShutdown(device.id)}
-                          disabled={loading}
-                          className="flex-1 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 disabled:bg-gray-500/20 border border-red-500/50 text-red-100 text-xs font-medium rounded transition-colors disabled:cursor-not-allowed"
-                          title="Shutdown device"
-                        >
-                          🔴 Shutdown
-                        </button>
-                      </div>
-                    )}
+                      )}
+
+                      {/* Show sleep/shutdown when online AND has SSH credentials */}
+                      {device.ssh_username && device.ssh_password && deviceStatuses.get(device.id)?.online && (
+                        <>
+                          <button
+                            onClick={() => handleSleep(device.id)}
+                            disabled={loading || deviceStatuses.get(device.id)?.sleeping}
+                            className="flex-1 px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 disabled:bg-gray-500/20 border border-yellow-500/50 text-yellow-100 text-xs font-medium rounded transition-colors disabled:cursor-not-allowed"
+                            title="Put device to sleep"
+                          >
+                            💤 Sleep
+                          </button>
+                          <button
+                            onClick={() => handleShutdown(device.id)}
+                            disabled={loading}
+                            className="flex-1 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 disabled:bg-gray-500/20 border border-red-500/50 text-red-100 text-xs font-medium rounded transition-colors disabled:cursor-not-allowed"
+                            title="Shutdown device"
+                          >
+                            🔴 Shutdown
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 ))
               )}
