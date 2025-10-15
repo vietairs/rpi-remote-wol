@@ -10,9 +10,9 @@
 
 ## 📋 Executive Summary
 
-Add comprehensive system monitoring (CPU, RAM, GPU, Network) to the PC Remote Wake application, with real-time dashboard visualization and optional Apple Home integration via Homebridge.
+Add comprehensive system monitoring (CPU, RAM, GPU, Network, Power Consumption) to the PC Remote Wake application, with real-time dashboard visualization and optional Apple Home integration via Homebridge.
 
-**Goal**: Create btop-like monitoring experience accessible via web dashboard and Apple Home app.
+**Goal**: Create btop-like monitoring experience accessible via web dashboard and Apple Home app, with energy consumption tracking.
 
 **Target Devices**: Windows 11 PCs with SSH enabled
 **Deployment**: Raspberry Pi (Next.js app + Homebridge)
@@ -80,7 +80,7 @@ Windows PC (SSH) → PowerShell Commands → Metrics Data
 
 - [x] 1.3: Implement PowerShell commands for Windows metrics
   - **Status**: ✅ Complete
-  - **Commands**: CPU (Get-Counter), RAM (CIM), GPU (nvidia-smi), Network (Get-NetAdapterStatistics)
+  - **Commands**: CPU (Get-Counter), RAM (CIM), GPU (nvidia-smi), Network (Get-NetAdapterStatistics), Power (Power Meter)
   - **Testing**: Ready for Windows 11 PC testing
 
 - [x] 1.4: API endpoints created
@@ -89,19 +89,23 @@ Windows PC (SSH) → PowerShell Commands → Metrics Data
     - `/api/metrics/collect` - POST endpoint for collection
     - `/api/metrics/[deviceId]/latest` - GET latest metrics
     - `/api/metrics/[deviceId]` - GET historical metrics (1h/6h/24h)
+    - `/api/metrics/[deviceId]/energy` - GET energy consumption (day/month/year)
     - `/api/metrics/cleanup` - POST cleanup old metrics
 
 #### Deliverables
-- ✅ Database schema updated with system_metrics table
+- ✅ Database schema updated with system_metrics table (including power_consumption_w)
 - ✅ Metrics collection service functional with TypeScript types
-- ✅ PowerShell commands implemented (CPU, RAM, GPU, Network)
-- ✅ All API endpoints created and type-safe
-- ✅ Production build successful
+- ✅ PowerShell commands implemented (CPU, RAM, GPU, Network, Power)
+- ✅ All API endpoints created and type-safe (including energy aggregation)
+- ✅ Energy consumption calculation with trapezoidal integration
+- ✅ Production build successful and deployed
 
 #### Blockers / Notes
 - **Note**: Network metrics return null (requires delta calculation between samples for rate)
 - **Note**: GPU metrics only work with NVIDIA GPUs (nvidia-smi command)
-- **Ready for**: Phase 2 testing with actual Windows PC
+- **Note**: Power consumption requires Windows Power Meter counter (may not be available on all systems)
+- **Documentation**: See `docs/POWER_CONSUMPTION_IMPLEMENTATION.md` for complete power monitoring details
+- **Ready for**: Phase 3 (Frontend Dashboard)
 
 ---
 
@@ -386,6 +390,7 @@ CREATE TABLE IF NOT EXISTS system_metrics (
   gpu_memory_total_mb INTEGER,     -- MB
   network_rx_mbps REAL,            -- Megabits per second
   network_tx_mbps REAL,            -- Megabits per second
+  power_consumption_w REAL,        -- Watts (null if unavailable)
   timestamp INTEGER NOT NULL,      -- Unix timestamp
   FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
 );
@@ -412,6 +417,18 @@ nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noh
 
 # Network Usage (delta calculation required)
 Get-NetAdapterStatistics | Where-Object {$_.Name -notlike '*Loopback*'} | Select-Object Name, ReceivedBytes, SentBytes
+
+# Power Consumption (Watts)
+try {
+  $power = (Get-Counter '\Power Meter(_Total)\Power').CounterSamples.CookedValue;
+  if ($power -and $power -gt 0) {
+    [math]::Round($power, 2)
+  } else {
+    Write-Output "N/A"
+  }
+} catch {
+  Write-Output "N/A"
+}
 ```
 
 ### **API Endpoints**
@@ -564,6 +581,8 @@ Get-NetAdapterStatistics | Where-Object {$_.Name -notlike '*Loopback*'} | Select
 | 2025-10-15 | Use SSH + PowerShell for metrics collection | Leverages existing SSH infrastructure, no additional software on Windows | Windows agent service (requires installation) |
 | 2025-10-15 | 24-hour retention policy | Balances storage vs. historical data needs | 7-day retention (excessive for use case) |
 | 2025-10-15 | Use temperature/humidity sensors in HomeKit | HomeKit lacks native CPU/RAM sensors | Custom HomeKit accessory type (complex, poor compatibility) |
+| 2025-10-15 | Add power consumption monitoring | User-requested feature for energy tracking and day/month/year aggregation | External power meter integration (requires additional hardware) |
+| 2025-10-15 | Use trapezoidal integration for energy calculation | Accurate for non-uniform sampling intervals, standard method | Simple summation (inaccurate), rectangular approximation (less accurate) |
 | TBD | | | |
 
 ---

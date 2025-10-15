@@ -82,6 +82,7 @@ export async function POST(request: NextRequest) {
       gpu_memory_total_mb: result.metrics.gpu?.memoryTotal ?? undefined,
       network_rx_mbps: result.metrics.network?.rxMbps ?? undefined,
       network_tx_mbps: result.metrics.network?.txMbps ?? undefined,
+      power_consumption_w: result.metrics.power?.watts ?? undefined,
       timestamp: result.timestamp,
     });
 

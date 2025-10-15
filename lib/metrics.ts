@@ -17,6 +17,9 @@ export interface MetricsData {
     rxMbps: number | null;
     txMbps: number | null;
   } | null;
+  power: {
+    watts: number | null;
+  } | null;
 }
 
 export interface MetricsCollectionResult {
@@ -33,14 +36,14 @@ const POWERSHELL_COMMANDS = {
   // CPU usage percentage
   cpu: `(Get-Counter '\\Processor(_Total)\\% Processor Time').CounterSamples.CookedValue`,
 
-  // RAM usage (outputs JSON)
+  // RAM usage (outputs comma-separated values on single line)
   ram: `
     $os = Get-CimInstance Win32_OperatingSystem;
     $totalGB = [math]::Round($os.TotalVisibleMemorySize/1MB, 2);
     $freeGB = [math]::Round($os.FreePhysicalMemory/1MB, 2);
     $usedGB = [math]::Round($totalGB - $freeGB, 2);
     $usedPercent = [math]::Round((1 - $os.FreePhysicalMemory/$os.TotalVisibleMemorySize) * 100, 2);
-    Write-Output "$usedGB,$totalGB,$usedPercent"
+    @($usedGB,$totalGB,$usedPercent) -join ','
   `.trim(),
 
   // GPU usage (NVIDIA only, may fail if no GPU or AMD/Intel)
@@ -59,6 +62,20 @@ const POWERSHELL_COMMANDS = {
     Where-Object {$_.Name -notlike '*Loopback*' -and $_.Name -notlike '*Bluetooth*'} |
     Select-Object -First 1 |
     ForEach-Object { Write-Output "$($_.ReceivedBytes),$($_.SentBytes)" }
+  `.trim(),
+
+  // Power consumption in watts
+  power: `
+    try {
+      $power = (Get-Counter '\\Power Meter(_Total)\\Power').CounterSamples.CookedValue;
+      if ($power -and $power -gt 0) {
+        [math]::Round($power, 2)
+      } else {
+        Write-Output "N/A"
+      }
+    } catch {
+      Write-Output "N/A"
+    }
   `.trim(),
 };
 
@@ -89,11 +106,12 @@ export async function collectMetrics(device: Device): Promise<MetricsCollectionR
     });
 
     // Collect all metrics in parallel for speed
-    const [cpuResult, ramResult, gpuResult, networkResult] = await Promise.allSettled([
+    const [cpuResult, ramResult, gpuResult, networkResult, powerResult] = await Promise.allSettled([
       executePowerShellCommand(ssh, POWERSHELL_COMMANDS.cpu, 5000),
       executePowerShellCommand(ssh, POWERSHELL_COMMANDS.ram, 5000),
       executePowerShellCommand(ssh, POWERSHELL_COMMANDS.gpu, 5000),
       executePowerShellCommand(ssh, POWERSHELL_COMMANDS.network, 5000),
+      executePowerShellCommand(ssh, POWERSHELL_COMMANDS.power, 5000),
     ]);
 
     // Parse results
@@ -101,6 +119,7 @@ export async function collectMetrics(device: Device): Promise<MetricsCollectionR
     const ram = ramResult.status === 'fulfilled' ? parseRamOutput(ramResult.value) : { used: null, total: null, percent: null };
     const gpu = gpuResult.status === 'fulfilled' ? parseGpuOutput(gpuResult.value) : null;
     const network = networkResult.status === 'fulfilled' ? parseNetworkOutput(networkResult.value) : null;
+    const power = powerResult.status === 'fulfilled' ? parsePowerOutput(powerResult.value) : null;
 
     return {
       success: true,
@@ -109,6 +128,7 @@ export async function collectMetrics(device: Device): Promise<MetricsCollectionR
         ram,
         gpu,
         network,
+        power,
       },
       timestamp,
     };
@@ -136,7 +156,12 @@ async function executePowerShellCommand(
     setTimeout(() => reject(new Error('Command timeout')), timeout);
   });
 
-  const commandPromise = ssh.execCommand(`powershell -Command "${command.replace(/"/g, '\\"')}"`, {
+  // Use Base64 encoding to avoid all shell escaping issues
+  // PowerShell expects UTF-16LE encoding for EncodedCommand
+  const commandBuffer = Buffer.from(command, 'utf16le');
+  const base64Command = commandBuffer.toString('base64');
+
+  const commandPromise = ssh.execCommand(`powershell -NoProfile -EncodedCommand ${base64Command}`, {
     execOptions: { pty: false },
   });
 
@@ -158,14 +183,20 @@ function parseCpuOutput(output: string): number | null {
 }
 
 /**
- * Parse RAM output: "usedGB,totalGB,usedPercent"
+ * Parse RAM output: "usedGB,totalGB,usedPercent" or "usedGB\ntotalGB\nusedPercent"
  */
 function parseRamOutput(output: string): {
   used: number | null;
   total: number | null;
   percent: number | null;
 } {
-  const parts = output.split(',').map(s => parseFloat(s.trim()));
+  // Try comma-separated first
+  let parts = output.split(',').map(s => parseFloat(s.trim()));
+
+  // If that doesn't work, try newline-separated
+  if (parts.length !== 3 || parts.some(isNaN)) {
+    parts = output.split(/[\r\n]+/).map(s => parseFloat(s.trim()));
+  }
 
   if (parts.length !== 3 || parts.some(isNaN)) {
     return { used: null, total: null, percent: null };
@@ -216,4 +247,25 @@ function parseNetworkOutput(_output: string): {
   // Network rate calculation requires storing previous sample and computing delta
   // For MVP, return null and implement in future iteration
   return null;
+}
+
+/**
+ * Parse power output: watts value
+ * Returns null if power meter unavailable
+ */
+function parsePowerOutput(output: string): {
+  watts: number | null;
+} | null {
+  if (output === 'N/A' || !output) {
+    return null;
+  }
+
+  const value = parseFloat(output);
+  if (isNaN(value) || value <= 0) {
+    return null;
+  }
+
+  return {
+    watts: Math.round(value * 100) / 100,
+  };
 }

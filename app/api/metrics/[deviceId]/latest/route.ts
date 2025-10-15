@@ -92,6 +92,11 @@ export async function GET(
               txMbps: latestMetrics.network_tx_mbps,
             }
           : null,
+        power: latestMetrics.power_consumption_w
+          ? {
+              watts: latestMetrics.power_consumption_w,
+            }
+          : null,
       },
       timestamp: latestMetrics.timestamp,
       collectedAt: new Date(latestMetrics.timestamp * 1000).toISOString(),
