@@ -95,6 +95,7 @@ export async function GET(
         power: latestMetrics.power_consumption_w
           ? {
               watts: latestMetrics.power_consumption_w,
+              estimated: latestMetrics.power_estimated === 1,
             }
           : null,
       },

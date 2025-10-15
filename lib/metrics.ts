@@ -12,6 +12,7 @@ export interface MetricsData {
     usage: number | null;
     memoryUsed: number | null;
     memoryTotal: number | null;
+    powerDraw?: number | null;
   } | null;
   network: {
     rxMbps: number | null;
@@ -19,6 +20,7 @@ export interface MetricsData {
   } | null;
   power: {
     watts: number | null;
+    estimated: boolean;
   } | null;
 }
 
@@ -46,10 +48,10 @@ const POWERSHELL_COMMANDS = {
     @($usedGB,$totalGB,$usedPercent) -join ','
   `.trim(),
 
-  // GPU usage (NVIDIA only, may fail if no GPU or AMD/Intel)
+  // GPU usage and power draw (NVIDIA only, may fail if no GPU or AMD/Intel)
   gpu: `
     try {
-      $result = nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits 2>&1;
+      $result = nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total,power.draw --format=csv,noheader,nounits 2>&1;
       if ($LASTEXITCODE -eq 0) { Write-Output $result } else { Write-Output "N/A" }
     } catch {
       Write-Output "N/A"
@@ -64,7 +66,21 @@ const POWERSHELL_COMMANDS = {
     ForEach-Object { Write-Output "$($_.ReceivedBytes),$($_.SentBytes)" }
   `.trim(),
 
-  // Power consumption in watts
+  // CPU power consumption (Intel-specific counter for package power)
+  cpuPower: `
+    try {
+      $cpuPower = (Get-Counter '\\Power Meter(Intel CPU)\\Power').CounterSamples.CookedValue;
+      if ($cpuPower -and $cpuPower -gt 0) {
+        [math]::Round($cpuPower, 2)
+      } else {
+        Write-Output "N/A"
+      }
+    } catch {
+      Write-Output "N/A"
+    }
+  `.trim(),
+
+  // Total system power consumption (may not be available on all systems)
   power: `
     try {
       $power = (Get-Counter '\\Power Meter(_Total)\\Power').CounterSamples.CookedValue;
@@ -106,11 +122,12 @@ export async function collectMetrics(device: Device): Promise<MetricsCollectionR
     });
 
     // Collect all metrics in parallel for speed
-    const [cpuResult, ramResult, gpuResult, networkResult, powerResult] = await Promise.allSettled([
+    const [cpuResult, ramResult, gpuResult, networkResult, cpuPowerResult, powerResult] = await Promise.allSettled([
       executePowerShellCommand(ssh, POWERSHELL_COMMANDS.cpu, 5000),
       executePowerShellCommand(ssh, POWERSHELL_COMMANDS.ram, 5000),
       executePowerShellCommand(ssh, POWERSHELL_COMMANDS.gpu, 5000),
       executePowerShellCommand(ssh, POWERSHELL_COMMANDS.network, 5000),
+      executePowerShellCommand(ssh, POWERSHELL_COMMANDS.cpuPower, 5000),
       executePowerShellCommand(ssh, POWERSHELL_COMMANDS.power, 5000),
     ]);
 
@@ -119,7 +136,30 @@ export async function collectMetrics(device: Device): Promise<MetricsCollectionR
     const ram = ramResult.status === 'fulfilled' ? parseRamOutput(ramResult.value) : { used: null, total: null, percent: null };
     const gpu = gpuResult.status === 'fulfilled' ? parseGpuOutput(gpuResult.value) : null;
     const network = networkResult.status === 'fulfilled' ? parseNetworkOutput(networkResult.value) : null;
-    const power = powerResult.status === 'fulfilled' ? parsePowerOutput(powerResult.value) : null;
+    const cpuPower = cpuPowerResult.status === 'fulfilled' ? parseCpuPowerOutput(cpuPowerResult.value) : null;
+    const totalPower = powerResult.status === 'fulfilled' ? parsePowerOutput(powerResult.value) : null;
+
+    // Determine power consumption strategy
+    let power: { watts: number; estimated: boolean } | null = null;
+
+    // Strategy 1: Use total system power meter (most accurate, includes everything)
+    if (totalPower && totalPower.watts !== null) {
+      power = { watts: totalPower.watts, estimated: false };
+    }
+    // Strategy 2: Aggregate CPU + GPU sensor power (hardware sensors)
+    else if ((cpuPower !== null && cpuPower > 0) || (gpu && gpu.powerDraw !== null && gpu.powerDraw !== undefined && gpu.powerDraw > 0)) {
+      const cpuWatts = cpuPower ?? 0;
+      const gpuWatts = gpu?.powerDraw ?? 0;
+      const baseSystemWatts = 50; // Motherboard, RAM, storage, fans estimate
+      power = { watts: cpuWatts + gpuWatts + baseSystemWatts, estimated: false };
+    }
+    // Strategy 3: Estimate from CPU/GPU utilization
+    else if (cpu !== null) {
+      const estimatedWatts = estimatePowerConsumption(cpu, gpu);
+      if (estimatedWatts !== null) {
+        power = { watts: estimatedWatts, estimated: true };
+      }
+    }
 
     return {
       success: true,
@@ -210,13 +250,14 @@ function parseRamOutput(output: string): {
 }
 
 /**
- * Parse GPU output: "usage, memoryUsed, memoryTotal" (NVIDIA format)
+ * Parse GPU output: "usage, memoryUsed, memoryTotal, powerDraw" (NVIDIA format)
  * Returns null if GPU unavailable
  */
 function parseGpuOutput(output: string): {
   usage: number | null;
   memoryUsed: number | null;
   memoryTotal: number | null;
+  powerDraw?: number | null;
 } | null {
   if (output === 'N/A' || !output) {
     return null;
@@ -224,15 +265,26 @@ function parseGpuOutput(output: string): {
 
   const parts = output.split(',').map(s => parseFloat(s.trim()));
 
-  if (parts.length !== 3 || parts.some(isNaN)) {
-    return null;
+  // Support both old format (3 values) and new format (4 values with power draw)
+  if (parts.length === 3 && !parts.some(isNaN)) {
+    return {
+      usage: Math.round(parts[0] * 100) / 100,
+      memoryUsed: Math.round(parts[1]),
+      memoryTotal: Math.round(parts[2]),
+      powerDraw: null,
+    };
   }
 
-  return {
-    usage: Math.round(parts[0] * 100) / 100,
-    memoryUsed: Math.round(parts[1]),
-    memoryTotal: Math.round(parts[2]),
-  };
+  if (parts.length === 4 && !parts.some(isNaN)) {
+    return {
+      usage: Math.round(parts[0] * 100) / 100,
+      memoryUsed: Math.round(parts[1]),
+      memoryTotal: Math.round(parts[2]),
+      powerDraw: Math.round(parts[3] * 100) / 100, // Power in Watts
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -247,6 +299,23 @@ function parseNetworkOutput(_output: string): {
   // Network rate calculation requires storing previous sample and computing delta
   // For MVP, return null and implement in future iteration
   return null;
+}
+
+/**
+ * Parse CPU power output: watts value from Intel power sensor
+ * Returns null if sensor unavailable
+ */
+function parseCpuPowerOutput(output: string): number | null {
+  if (output === 'N/A' || !output) {
+    return null;
+  }
+
+  const value = parseFloat(output);
+  if (isNaN(value) || value <= 0) {
+    return null;
+  }
+
+  return Math.round(value * 100) / 100;
 }
 
 /**
@@ -268,4 +337,33 @@ function parsePowerOutput(output: string): {
   return {
     watts: Math.round(value * 100) / 100,
   };
+}
+
+/**
+ * Estimate power consumption based on CPU and GPU utilization
+ * Uses real TDP values for Intel Core i9-13900KF and NVIDIA RTX 4080
+ */
+function estimatePowerConsumption(
+  cpuPercent: number,
+  gpu: { usage: number | null; powerDraw?: number | null } | null
+): number | null {
+  // Component power consumption (watts) - Real hardware TDP values
+  const BASE_SYSTEM_POWER = 50; // Motherboard, RAM, storage, fans
+  const CPU_TDP = 253; // Intel Core i9-13900KF (PL2/Turbo Power)
+  const GPU_TDP = 320; // NVIDIA RTX 4080 ASUS ROG Gaming OC
+
+  // CPU power scales with utilization using square root for realistic power curve
+  // Square root models how modern CPUs scale power with frequency/utilization
+  const cpuPower = BASE_SYSTEM_POWER + (CPU_TDP * Math.sqrt(cpuPercent / 100));
+
+  // Add GPU power if GPU present and has usage data
+  let gpuPower = 0;
+  if (gpu && gpu.usage !== null && gpu.usage > 0) {
+    // GPU power also scales with utilization
+    gpuPower = GPU_TDP * Math.sqrt(gpu.usage / 100);
+  }
+
+  const totalPower = cpuPower + gpuPower;
+
+  return Math.round(totalPower * 100) / 100;
 }
