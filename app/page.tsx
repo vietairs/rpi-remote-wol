@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import MetricsPanel from '@/components/metrics/MetricsPanel';
 
 interface Device {
   id: number;
@@ -38,6 +39,7 @@ export default function Home() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
   const [deviceStatuses, setDeviceStatuses] = useState<Map<number, DeviceStatus>>(new Map());
   const [currentUser, setCurrentUser] = useState<string>('');
+  const [metricsDeviceId, setMetricsDeviceId] = useState<number | null>(null);
   const statusCheckInterval = useRef<NodeJS.Timeout | null>(null);
   const wakeMonitorTimeout = useRef<NodeJS.Timeout | null>(null);
 
@@ -992,6 +994,17 @@ export default function Home() {
                           </button>
                         </>
                       )}
+
+                      {/* Show metrics button when online AND has SSH credentials */}
+                      {device.ssh_username && device.ssh_password && deviceStatuses.get(device.id)?.online && (
+                        <button
+                          onClick={() => setMetricsDeviceId(device.id)}
+                          className="flex-1 px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 text-purple-100 text-xs font-medium rounded transition-colors"
+                          title="View system metrics"
+                        >
+                          📊 Metrics
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))
@@ -999,6 +1012,17 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {/* Metrics Panel */}
+        {metricsDeviceId && (
+          <div className="mt-6">
+            <MetricsPanel
+              deviceId={metricsDeviceId}
+              deviceName={savedDevices.find(d => d.id === metricsDeviceId)?.name || 'Device'}
+              onClose={() => setMetricsDeviceId(null)}
+            />
+          </div>
+        )}
 
         {status && (
           <div
