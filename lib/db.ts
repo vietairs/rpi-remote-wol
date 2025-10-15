@@ -60,6 +60,7 @@ export interface SystemMetrics {
   gpu_memory_total_mb: number | null;
   network_rx_mbps: number | null;
   network_tx_mbps: number | null;
+  power_consumption_w: number | null;
   timestamp: number;
   created_at: string;
 }
@@ -75,6 +76,7 @@ export interface SystemMetricsInput {
   gpu_memory_total_mb?: number;
   network_rx_mbps?: number;
   network_tx_mbps?: number;
+  power_consumption_w?: number;
   timestamp: number;
 }
 
@@ -142,6 +144,7 @@ function getDb(): Database.Database {
         gpu_memory_total_mb INTEGER,
         network_rx_mbps REAL,
         network_tx_mbps REAL,
+        power_consumption_w REAL,
         timestamp INTEGER NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
@@ -149,14 +152,17 @@ function getDb(): Database.Database {
 
       CREATE INDEX IF NOT EXISTS idx_metrics_device_time
       ON system_metrics(device_id, timestamp DESC);
+
+      CREATE INDEX IF NOT EXISTS idx_metrics_device_created
+      ON system_metrics(device_id, created_at DESC);
     `);
 
-    // Migration: Add ip_address column if it doesn't exist
+    // Migration: Add columns if they don't exist
     try {
-      const columns = db.pragma('table_info(devices)') as Array<{ name: string }>;
-      const hasIpAddress = columns.some(col => col.name === 'ip_address');
-      const hasSshUsername = columns.some(col => col.name === 'ssh_username');
-      const hasSshPassword = columns.some(col => col.name === 'ssh_password');
+      const deviceColumns = db.pragma('table_info(devices)') as Array<{ name: string }>;
+      const hasIpAddress = deviceColumns.some(col => col.name === 'ip_address');
+      const hasSshUsername = deviceColumns.some(col => col.name === 'ssh_username');
+      const hasSshPassword = deviceColumns.some(col => col.name === 'ssh_password');
 
       if (!hasIpAddress) {
         db.exec('ALTER TABLE devices ADD COLUMN ip_address TEXT');
@@ -166,6 +172,14 @@ function getDb(): Database.Database {
       }
       if (!hasSshPassword) {
         db.exec('ALTER TABLE devices ADD COLUMN ssh_password TEXT');
+      }
+
+      // Migration for system_metrics table
+      const metricsColumns = db.pragma('table_info(system_metrics)') as Array<{ name: string }>;
+      const hasPowerConsumption = metricsColumns.some(col => col.name === 'power_consumption_w');
+
+      if (!hasPowerConsumption) {
+        db.exec('ALTER TABLE system_metrics ADD COLUMN power_consumption_w REAL');
       }
     } catch (error) {
       // Column might already exist or table doesn't exist yet
@@ -346,11 +360,11 @@ export const metricsDb = {
       INSERT INTO system_metrics (
         device_id, cpu_percent, ram_used_gb, ram_total_gb, ram_percent,
         gpu_percent, gpu_memory_used_mb, gpu_memory_total_mb,
-        network_rx_mbps, network_tx_mbps, timestamp
+        network_rx_mbps, network_tx_mbps, power_consumption_w, timestamp
       ) VALUES (
         @device_id, @cpu_percent, @ram_used_gb, @ram_total_gb, @ram_percent,
         @gpu_percent, @gpu_memory_used_mb, @gpu_memory_total_mb,
-        @network_rx_mbps, @network_tx_mbps, @timestamp
+        @network_rx_mbps, @network_tx_mbps, @power_consumption_w, @timestamp
       )
     `);
     const result = insertStmt.run({
@@ -364,6 +378,7 @@ export const metricsDb = {
       gpu_memory_total_mb: metrics.gpu_memory_total_mb ?? null,
       network_rx_mbps: metrics.network_rx_mbps ?? null,
       network_tx_mbps: metrics.network_tx_mbps ?? null,
+      power_consumption_w: metrics.power_consumption_w ?? null,
       timestamp: metrics.timestamp,
     });
 
@@ -408,6 +423,92 @@ export const metricsDb = {
     const stmt = database.prepare('SELECT COUNT(*) as count FROM system_metrics WHERE device_id = ?');
     const result = stmt.get(deviceId) as { count: number };
     return result.count;
+  },
+
+  /**
+   * Calculate energy consumption (kWh) for a device over a time period
+   * Uses trapezoidal integration: energy = sum((p1 + p2) / 2 * dt) where dt is in hours
+   */
+  getEnergyConsumption: (
+    deviceId: number,
+    startTimestamp: number,
+    endTimestamp: number
+  ): { energyKwh: number; dataPoints: number } => {
+    const database = getDb();
+    const stmt = database.prepare(`
+      SELECT power_consumption_w, timestamp
+      FROM system_metrics
+      WHERE device_id = ? AND timestamp >= ? AND timestamp <= ?
+      AND power_consumption_w IS NOT NULL
+      ORDER BY timestamp ASC
+    `);
+
+    const metrics = stmt.all(deviceId, startTimestamp, endTimestamp) as Array<{
+      power_consumption_w: number;
+      timestamp: number;
+    }>;
+
+    if (metrics.length < 2) {
+      return { energyKwh: 0, dataPoints: metrics.length };
+    }
+
+    // Trapezoidal integration to calculate energy consumption
+    let totalEnergyWh = 0;
+
+    for (let i = 0; i < metrics.length - 1; i++) {
+      const p1 = metrics[i].power_consumption_w;
+      const p2 = metrics[i + 1].power_consumption_w;
+      const dt = (metrics[i + 1].timestamp - metrics[i].timestamp) / 3600; // Convert to hours
+
+      // Average power over interval * time
+      const energyWh = ((p1 + p2) / 2) * dt;
+      totalEnergyWh += energyWh;
+    }
+
+    return {
+      energyKwh: totalEnergyWh / 1000, // Convert Wh to kWh
+      dataPoints: metrics.length,
+    };
+  },
+
+  /**
+   * Get power consumption statistics for a time period
+   */
+  getPowerStats: (
+    deviceId: number,
+    startTimestamp: number,
+    endTimestamp: number
+  ): {
+    avgPowerW: number | null;
+    maxPowerW: number | null;
+    minPowerW: number | null;
+    dataPoints: number;
+  } => {
+    const database = getDb();
+    const stmt = database.prepare(`
+      SELECT
+        AVG(power_consumption_w) as avg_power,
+        MAX(power_consumption_w) as max_power,
+        MIN(power_consumption_w) as min_power,
+        COUNT(*) as count
+      FROM system_metrics
+      WHERE device_id = ? AND timestamp >= ? AND timestamp <= ?
+      AND power_consumption_w IS NOT NULL
+    `);
+
+    const result = stmt.get(deviceId, startTimestamp, endTimestamp) as {
+      avg_power: number | null;
+      max_power: number | null;
+      min_power: number | null;
+      count: number;
+    };
+
+    return {
+      avgPowerW: result.avg_power,
+      maxPowerW: result.max_power,
+      minPowerW: result.min_power,
+      dataPoints: result.count,
+    };
   },
 };
 

@@ -133,6 +133,11 @@ export async function GET(
       value: m.network_tx_mbps,
     }));
 
+    const power = historicalMetrics.map(m => ({
+      timestamp: m.timestamp,
+      value: m.power_consumption_w,
+    }));
+
     return NextResponse.json({
       deviceId,
       duration,
@@ -145,6 +150,7 @@ export async function GET(
           rx: networkRx,
           tx: networkTx,
         },
+        power,
       },
     });
   } catch (error) {
