@@ -21,6 +21,7 @@ interface MetricsData {
   } | null;
   power: {
     watts: number | null;
+    estimated: boolean;
   } | null;
 }
 
@@ -253,7 +254,7 @@ export default function MetricsPanel({ deviceId, deviceName, onClose }: MetricsP
             unit="W"
             max={500}
             icon="⚡"
-            subtitle="Consumption"
+            subtitle={metrics.power.estimated ? "Estimated" : "Consumption"}
           />
         )}
       </div>
@@ -262,6 +263,11 @@ export default function MetricsPanel({ deviceId, deviceName, onClose }: MetricsP
       <div className="mt-6 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
         <p className="text-blue-200 text-xs">
           💡 Metrics are automatically refreshed every 30 seconds. Click &quot;Refresh&quot; to collect new data immediately.
+          {metrics?.power?.estimated && (
+            <span className="block mt-1">
+              ⚡ Power consumption is estimated based on CPU/GPU usage (hardware monitoring unavailable).
+            </span>
+          )}
         </p>
       </div>
     </div>

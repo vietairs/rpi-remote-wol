@@ -61,6 +61,7 @@ export interface SystemMetrics {
   network_rx_mbps: number | null;
   network_tx_mbps: number | null;
   power_consumption_w: number | null;
+  power_estimated: number | null;
   timestamp: number;
   created_at: string;
 }
@@ -77,6 +78,7 @@ export interface SystemMetricsInput {
   network_rx_mbps?: number;
   network_tx_mbps?: number;
   power_consumption_w?: number;
+  power_estimated?: boolean;
   timestamp: number;
 }
 
@@ -145,6 +147,7 @@ function getDb(): Database.Database {
         network_rx_mbps REAL,
         network_tx_mbps REAL,
         power_consumption_w REAL,
+        power_estimated INTEGER DEFAULT 0,
         timestamp INTEGER NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
@@ -177,9 +180,13 @@ function getDb(): Database.Database {
       // Migration for system_metrics table
       const metricsColumns = db.pragma('table_info(system_metrics)') as Array<{ name: string }>;
       const hasPowerConsumption = metricsColumns.some(col => col.name === 'power_consumption_w');
+      const hasPowerEstimated = metricsColumns.some(col => col.name === 'power_estimated');
 
       if (!hasPowerConsumption) {
         db.exec('ALTER TABLE system_metrics ADD COLUMN power_consumption_w REAL');
+      }
+      if (!hasPowerEstimated) {
+        db.exec('ALTER TABLE system_metrics ADD COLUMN power_estimated INTEGER DEFAULT 0');
       }
     } catch (error) {
       // Column might already exist or table doesn't exist yet
@@ -360,11 +367,11 @@ export const metricsDb = {
       INSERT INTO system_metrics (
         device_id, cpu_percent, ram_used_gb, ram_total_gb, ram_percent,
         gpu_percent, gpu_memory_used_mb, gpu_memory_total_mb,
-        network_rx_mbps, network_tx_mbps, power_consumption_w, timestamp
+        network_rx_mbps, network_tx_mbps, power_consumption_w, power_estimated, timestamp
       ) VALUES (
         @device_id, @cpu_percent, @ram_used_gb, @ram_total_gb, @ram_percent,
         @gpu_percent, @gpu_memory_used_mb, @gpu_memory_total_mb,
-        @network_rx_mbps, @network_tx_mbps, @power_consumption_w, @timestamp
+        @network_rx_mbps, @network_tx_mbps, @power_consumption_w, @power_estimated, @timestamp
       )
     `);
     const result = insertStmt.run({
@@ -379,6 +386,7 @@ export const metricsDb = {
       network_rx_mbps: metrics.network_rx_mbps ?? null,
       network_tx_mbps: metrics.network_tx_mbps ?? null,
       power_consumption_w: metrics.power_consumption_w ?? null,
+      power_estimated: metrics.power_estimated ? 1 : 0,
       timestamp: metrics.timestamp,
     });
 
