@@ -110,8 +110,38 @@ export default function Settings() {
   };
 
   const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setStatus('API key copied to clipboard!');
+    // Try modern clipboard API first
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text)
+        .then(() => {
+          setStatus('API key copied to clipboard!');
+        })
+        .catch(() => {
+          // Fallback to older method
+          fallbackCopyToClipboard(text);
+        });
+    } else {
+      // Use fallback for HTTP connections
+      fallbackCopyToClipboard(text);
+    }
+  };
+
+  const fallbackCopyToClipboard = (text: string) => {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      setStatus('API key copied to clipboard!');
+    } catch (err) {
+      setStatus('Failed to copy. Please select and copy manually.');
+    }
+    document.body.removeChild(textArea);
   };
 
   const formatDate = (dateString: string) => {
