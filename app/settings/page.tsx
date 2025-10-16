@@ -186,7 +186,7 @@ export default function Settings() {
               onClick={() => setGeneratedKey(null)}
               className="mt-3 text-green-200 hover:text-green-100 text-sm underline"
             >
-              I've saved the key
+              I have saved the key
             </button>
           </div>
         )}
