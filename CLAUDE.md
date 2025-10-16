@@ -308,6 +308,74 @@ const { online, rdpReady } = await response.json();
 - Per-integration key tracking (`last_used_at`)
 - Easy revocation without affecting other integrations
 
+## Homebridge Plugin (Apple HomeKit Integration)
+
+A complete Homebridge plugin is included in the `homebridge-plugin/` directory, allowing you to control your PC and monitor metrics via Apple Home app.
+
+### Features
+
+**Control**:
+- Wake PC (Switch)
+- Sleep PC (Switch)
+- Shutdown PC (Switch)
+- Device Status (Contact Sensor - online/offline)
+
+**Monitoring**:
+- CPU Usage (Temperature Sensor - °C = % usage)
+- RAM Usage (Humidity Sensor - % = % usage)
+- GPU Usage (Temperature Sensor - °C = % usage)
+- Power Consumption (Light Sensor - Lux = Watts)
+
+### Installation
+
+```bash
+# Navigate to plugin directory
+cd homebridge-plugin
+
+# Run installation script
+chmod +x install.sh
+./install.sh
+```
+
+The script will:
+1. Install dependencies
+2. Link plugin to Homebridge
+3. Guide you through configuration (API key, device ID)
+4. Generate configuration snippet
+
+### Configuration
+
+Add to your Homebridge `config.json`:
+
+```json
+{
+  "platforms": [
+    {
+      "platform": "PCRemoteWake",
+      "name": "PC Remote Wake",
+      "baseUrl": "http://localhost:3000",
+      "apiKey": "pcw_xxxxxxxxxxxxx",
+      "deviceId": 1,
+      "deviceName": "Gaming PC",
+      "pollingInterval": 30
+    }
+  ]
+}
+```
+
+### Documentation
+
+- **Quick Start**: See `homebridge-plugin/QUICKSTART.md`
+- **Full Documentation**: See `homebridge-plugin/README.md`
+- **Config Schema**: See `homebridge-plugin/config.schema.json` (for Homebridge UI)
+
+### Siri Commands
+
+- "Hey Siri, turn on Wake PC"
+- "Hey Siri, what's the CPU temperature?"
+- "Hey Siri, what's the humidity in Gaming PC?" (RAM usage)
+- "Hey Siri, turn on Shutdown PC"
+
 ## Windows PC Requirements
 
 - Wake-on-LAN enabled in BIOS and Windows network adapter settings

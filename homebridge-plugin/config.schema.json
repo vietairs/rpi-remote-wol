@@ -1,0 +1,87 @@
+{
+  "pluginAlias": "PCRemoteWake",
+  "pluginType": "platform",
+  "singular": false,
+  "headerDisplay": "Monitor and control your Windows PC via Apple HomeKit",
+  "footerDisplay": "For help visit the [GitHub repository](https://github.com/vietairs/rpi-remote-wol)",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Platform Name",
+        "type": "string",
+        "default": "PC Remote Wake",
+        "required": true,
+        "description": "The name that will appear in Homebridge logs"
+      },
+      "baseUrl": {
+        "title": "API Base URL",
+        "type": "string",
+        "default": "http://localhost:3000",
+        "required": false,
+        "format": "uri",
+        "description": "The base URL for the PC Remote Wake API (usually http://localhost:3000)"
+      },
+      "apiKey": {
+        "title": "API Key",
+        "type": "string",
+        "required": true,
+        "placeholder": "pcw_xxxxxxxxxxxxx",
+        "description": "API key generated from the PC Remote Wake web UI (Settings → API Keys)"
+      },
+      "deviceId": {
+        "title": "Device ID",
+        "type": "integer",
+        "required": true,
+        "minimum": 1,
+        "placeholder": "1",
+        "description": "The device ID from the PC Remote Wake web UI (numeric ID)"
+      },
+      "deviceName": {
+        "title": "Device Name",
+        "type": "string",
+        "default": "PC",
+        "required": false,
+        "placeholder": "Gaming PC",
+        "description": "A friendly name for your PC (used as prefix for all accessories)"
+      },
+      "pollingInterval": {
+        "title": "Polling Interval (seconds)",
+        "type": "integer",
+        "default": 30,
+        "required": false,
+        "minimum": 10,
+        "maximum": 300,
+        "description": "How often to poll for metrics (10-300 seconds, default: 30)"
+      }
+    }
+  },
+  "layout": [
+    {
+      "type": "section",
+      "title": "API Configuration",
+      "items": [
+        "name",
+        "baseUrl",
+        "apiKey"
+      ]
+    },
+    {
+      "type": "section",
+      "title": "Device Configuration",
+      "items": [
+        "deviceId",
+        "deviceName",
+        "pollingInterval"
+      ]
+    },
+    {
+      "type": "help",
+      "helpvalue": "<p><strong>How to get your API Key:</strong></p><ol><li>Open PC Remote Wake web UI (http://localhost:3000)</li><li>Login with your credentials</li><li>Navigate to Settings or API Keys section</li><li>Click 'Generate New API Key'</li><li>Copy the key (starts with pcw_) - it's only shown once!</li></ol>"
+    },
+    {
+      "type": "help",
+      "helpvalue": "<p><strong>How to find your Device ID:</strong></p><ol><li>Open PC Remote Wake web UI</li><li>Look at your saved devices list</li><li>The device ID is the numeric identifier (1, 2, 3, etc.)</li></ol>"
+    }
+  ]
+}
