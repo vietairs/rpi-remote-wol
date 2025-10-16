@@ -640,6 +640,13 @@ export default function Home() {
               </span>
             )}
             <button
+              onClick={() => router.push('/settings')}
+              className="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-200 hover:text-blue-100 border border-blue-500/50 rounded-lg transition-colors text-sm font-medium"
+              title="Settings"
+            >
+              ⚙️ Settings
+            </button>
+            <button
               onClick={handleLogout}
               className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-200 hover:text-red-100 border border-red-500/50 rounded-lg transition-colors text-sm font-medium"
               title="Logout"
