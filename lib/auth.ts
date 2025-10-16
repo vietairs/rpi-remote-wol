@@ -89,9 +89,12 @@ export function generateApiKey(): string {
   // Generate 32-byte random hex string (64 characters)
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
-  return Array.from(bytes)
+  const randomHex = Array.from(bytes)
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
+
+  // Add pcw_ prefix for easy identification
+  return `pcw_${randomHex}`;
 }
 
 export async function hashApiKey(apiKey: string): Promise<string> {
