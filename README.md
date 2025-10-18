@@ -13,8 +13,10 @@ A Next.js web application for remotely waking your Windows 11 PC from sleep or p
 - 🔐 Secure authentication system with login page
 - 🎨 Modern, responsive UI with real-time status updates
 - 🔒 MAC address validation
-- 📱 Mobile-friendly design
+- 📱 Mobile-friendly design with **Progressive Web App (PWA)** support
 - 🌐 Accessible from any device on your network
+- 📲 **Install as mobile app** - Works on iPhone and Android home screens
+- ⚡ **Offline support** - Service worker caches assets for fast loading
 
 ## Prerequisites
 
@@ -130,6 +132,21 @@ Then access from any device on your network: `http://<raspberry-pi-ip>:3000`
 1. Enter your username and password
 2. Click "Sign In"
 3. You'll be taken to the main dashboard
+
+### Installing as Mobile App (PWA)
+
+**iPhone/iPad:**
+1. Open Safari and navigate to your app URL
+2. Tap the Share button (square with arrow)
+3. Scroll down and tap "Add to Home Screen"
+4. Tap "Add" - the app will appear on your home screen
+
+**Android:**
+1. Open Chrome and navigate to your app URL
+2. Tap the menu (⋮) → "Add to Home screen" or "Install app"
+3. The app icon will appear on your home screen
+
+Once installed, the app runs in standalone mode (no browser UI) and works offline. See [PWA_SETUP.md](PWA_SETUP.md) for detailed instructions.
 
 ### Adding Devices
 

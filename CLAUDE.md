@@ -46,6 +46,7 @@ SQLite database is auto-created at `data/devices.db` on first run. Contains:
 - `users` table (username, password_hash)
 - `devices` table (name, mac_address, ip_address, ssh_username, ssh_password)
 - `api_keys` table (key_hash, name, created_by, last_used_at)
+- `system_metrics` table (device metrics: CPU, RAM, GPU, network, power consumption)
 
 ## Architecture
 
@@ -64,6 +65,7 @@ app/
 │   ├── auth/        # Authentication endpoints (login, logout, session, init)
 │   ├── devices/     # Device CRUD operations
 │   ├── keys/        # API key management (create, list, delete)
+│   ├── metrics/     # System metrics (collect, retrieve, cleanup, energy stats)
 │   ├── wake/        # Wake-on-LAN endpoint
 │   ├── shutdown/    # SSH shutdown endpoint
 │   ├── sleep/       # SSH sleep endpoint
@@ -71,11 +73,13 @@ app/
 │   └── discover-ip/ # ARP-based IP discovery
 ├── login/           # Login page
 ├── setup/           # First-time admin account creation
-└── page.tsx         # Main dashboard
+├── settings/        # API key management UI
+└── page.tsx         # Main dashboard with metrics charts
 
 lib/
-├── db.ts            # Database layer (deviceDb, userDb, apiKeyDb)
-└── auth.ts          # Auth utilities (JWT, bcrypt, API keys, session management)
+├── db.ts            # Database layer (deviceDb, userDb, apiKeyDb, metricsDb)
+├── auth.ts          # Auth utilities (JWT, bcrypt, API keys, session management)
+└── metrics.ts       # System metrics collection via SSH + PowerShell
 
 tests/
 ├── e2e/             # Playwright E2E tests
@@ -146,6 +150,25 @@ middleware.ts         # Dual auth: JWT cookies + API key Bearer tokens
 - Returns plaintext key only once during creation (bcrypt-hashed storage)
 - Keys prefixed with `pcw_` for easy identification
 
+**System Metrics Collection** ([lib/metrics.ts](lib/metrics.ts)):
+- Collects real-time system metrics via SSH + PowerShell commands
+- `POST /api/metrics/collect` - Trigger metrics collection for device
+- `GET /api/metrics/[deviceId]` - Retrieve metrics history (last 24h by default)
+- `GET /api/metrics/[deviceId]/latest` - Get most recent metrics
+- `GET /api/metrics/[deviceId]/energy` - Energy consumption stats
+- `POST /api/metrics/cleanup` - Delete old metrics (>7 days)
+- Metrics collected:
+  - CPU usage (percentage)
+  - RAM usage (used/total GB, percentage)
+  - GPU usage, memory, power draw (NVIDIA via nvidia-smi)
+  - Power consumption (system meter or estimated from TDP)
+- Power measurement strategies:
+  1. Total system power meter (most accurate)
+  2. CPU + GPU sensor aggregation
+  3. TDP-based estimation from utilization
+- 5-second timeout per PowerShell command
+- Base64-encoded commands for shell escape safety
+
 ### Authentication Flow
 
 #### Web UI (JWT Cookie)
@@ -185,6 +208,8 @@ middleware.ts         # Dual auth: JWT cookies + API key Bearer tokens
 2. **Wake Device**: POST `/api/wake` with `{ macAddress }`
 3. **Check Status**: POST `/api/status` with `{ ipAddress }`
 4. **Remote Commands**: POST `/api/shutdown` or `/api/sleep` with `{ deviceId }`
+5. **Metrics Collection**: POST `/api/metrics/collect` with `{ deviceId }` (requires SSH credentials)
+6. **View Metrics**: GET `/api/metrics/[deviceId]?hours=24` for historical data
 
 ### Important Implementation Details
 
@@ -382,3 +407,31 @@ Add to your Homebridge `config.json`:
 - Fast Startup disabled for reliable WOL from powered-off state
 - OpenSSH server installed for shutdown/sleep commands
 - Ports 445 (SMB) or 3389 (RDP) open for status checking
+- PowerShell execution policy allows remote scripts (for metrics collection)
+- NVIDIA GPU with nvidia-smi for GPU metrics (optional, gracefully fails if unavailable)
+
+## Progressive Web App (PWA) Support
+
+The application can be installed as a mobile app on iOS/Android devices:
+
+### iOS Installation
+1. Open Safari on your iPhone/iPad
+2. Navigate to your app URL (e.g., `http://192.168.1.100:3000`)
+3. Tap the Share button (square with arrow)
+4. Scroll down and tap "Add to Home Screen"
+5. Name the app and tap "Add"
+6. The app will appear on your home screen like a native app
+
+### Android Installation
+1. Open Chrome on your Android device
+2. Navigate to your app URL
+3. Tap the menu (three dots)
+4. Tap "Add to Home screen" or "Install app"
+5. Follow the prompts to install
+
+### PWA Features
+- Standalone app experience (no browser UI)
+- Custom app icon on home screen
+- Offline-capable (service worker caching)
+- Fast loading with precached assets
+- Native app-like navigation
