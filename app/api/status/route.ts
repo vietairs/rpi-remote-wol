@@ -40,7 +40,11 @@ export async function POST(request: NextRequest) {
       checkedAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Status check error:', error);
+    // Log error without flooding logs - connection resets are expected for offline devices
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    if (!errorMessage.includes('ECONNRESET') && !errorMessage.includes('aborted')) {
+      console.error('Status check error:', error);
+    }
     return NextResponse.json(
       { error: 'Failed to check device status' },
       { status: 500 }
@@ -49,13 +53,21 @@ export async function POST(request: NextRequest) {
 }
 
 function checkPort(host: string, port: number, timeout: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    probe(host, port, (err, available) => {
-      if (err) {
-        resolve(false);
-      } else {
-        resolve(available);
-      }
-    }, { timeout });
-  });
+  return new Promise<boolean>((resolve) => {
+    try {
+      probe(host, port, (err, available) => {
+        if (err) {
+          resolve(false);
+        } else {
+          resolve(available);
+        }
+      }, { timeout });
+    } catch {
+      // Catch synchronous errors from probe (socket creation, etc.)
+      resolve(false);
+    }
+  }).catch(() => {
+    // Catch any unhandled promise rejections
+    return false;
+  }) as Promise<boolean>;
 }
