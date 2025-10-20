@@ -138,7 +138,7 @@ export default function Settings() {
     try {
       document.execCommand('copy');
       setStatus('API key copied to clipboard!');
-    } catch (err) {
+    } catch {
       setStatus('Failed to copy. Please select and copy manually.');
     }
     document.body.removeChild(textArea);

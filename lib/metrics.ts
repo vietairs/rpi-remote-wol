@@ -292,6 +292,7 @@ function parseGpuOutput(output: string): {
  * Note: This returns cumulative bytes. For rate calculation, need previous sample.
  * Returning null for now as we need delta calculation logic.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function parseNetworkOutput(_output: string): {
   rxMbps: number | null;
   txMbps: number | null;

@@ -544,11 +544,15 @@ export function checkpointWal(): { framesCheckpointed: number; framesInWal: numb
   const database = getDb();
 
   // RESTART mode: checkpoint and reset WAL file
-  const result = database.pragma('wal_checkpoint(RESTART)');
+  const result = database.pragma('wal_checkpoint(RESTART)') as Array<{
+    busy: number;
+    log: number;
+    checkpointed: number;
+  }>;
 
   return {
-    framesCheckpointed: result[0].busy || 0,
-    framesInWal: result[0].log || 0,
+    framesCheckpointed: result[0]?.checkpointed || 0,
+    framesInWal: result[0]?.log || 0,
   };
 }
 

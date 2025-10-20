@@ -52,7 +52,7 @@ export async function verifySession(token: string): Promise<SessionData | null> 
     }
 
     return null;
-  } catch (error) {
+  } catch {
     return null;
   }
 }
