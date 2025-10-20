@@ -70,63 +70,81 @@ pm2 startup
 # Follow the command it outputs
 ```
 
-#### 2. Setup Automated Database Maintenance (Recommended)
+#### 2. Verify Automated Maintenance is Running
 
-Create cron job to run database maintenance every 6 hours:
+The application now includes **automatic background maintenance** - no crontab needed!
+
+Check that the maintenance service started:
 
 ```bash
-# Edit crontab
-crontab -e
+# View PM2 logs to confirm service initialization
+pm2 logs "PC Remote Wake on Lan" --lines 50
 
-# Add this line (run every 6 hours)
-0 */6 * * * /usr/bin/curl -X POST -H "Content-Type: application/json" -d '{"operation":"checkpoint"}' http://localhost:3000/api/db-maintenance >> /tmp/pc-remote-wake-maintenance.log 2>&1
+# You should see these log entries:
+# [Instrumentation] Initializing server...
+# [Maintenance] Starting background maintenance service...
+# [Maintenance] WAL checkpoint every 6 hours
+# [Maintenance] Database optimization every 24 hours
+# [Maintenance] Performing WAL checkpoint...
+# [Maintenance] Checkpoint completed in Xms
 ```
 
-**Note**: This requires a valid session cookie. For better automation, consider:
+Check maintenance status via API:
 
-1. Using the maintenance script with API key authentication:
 ```bash
-# Get your API key from Settings page first
-API_KEY="pcw_xxxxxxxxxxxxx"
+curl http://localhost:3000/api/db-maintenance
 
-# Add to crontab
-0 */6 * * * /usr/bin/curl -X POST -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" -d '{"operation":"checkpoint"}' http://localhost:3000/api/db-maintenance >> /tmp/pc-remote-wake-maintenance.log 2>&1
-```
-
-2. Or use the provided script:
-```bash
-chmod +x scripts/db-maintenance.sh
-# Edit script to add your session token or API key
-# Add to crontab:
-0 */6 * * * /path/to/scripts/db-maintenance.sh
+# Expected response:
+# {
+#   "success": true,
+#   "backgroundService": {
+#     "running": true,
+#     "checkpointIntervalHours": 6,
+#     "optimizeIntervalHours": 24
+#   },
+#   "database": {
+#     "walFrames": <number>,
+#     "walFramesCheckpointed": <number>
+#   }
+# }
 ```
 
 #### 3. Monitor Database Health
 
-Check database WAL file size periodically:
+The background service automatically maintains the database, but you can monitor health:
+
 ```bash
+# Check database file sizes
 ls -lh data/devices.db*
 ```
 
-Healthy state:
+**Healthy state:**
 - `devices.db` - main database file
-- `devices.db-wal` - should be small (< 5MB typically)
+- `devices.db-wal` - should stay small (< 5MB with auto-maintenance)
 - `devices.db-shm` - shared memory file (small)
 
-If WAL file grows large (>50MB), run manual checkpoint:
+**If WAL file grows large (>50MB)**, the background service will log warnings. You can also trigger manual checkpoint:
+
 ```bash
+# Manual checkpoint trigger (if needed)
 curl -X POST http://localhost:3000/api/db-maintenance \
   -H "Content-Type: application/json" \
   -d '{"operation":"checkpoint"}'
+
+# Or trigger optimization
+curl -X POST http://localhost:3000/api/db-maintenance \
+  -H "Content-Type: application/json" \
+  -d '{"operation":"optimize"}'
 ```
 
 ### Performance Improvements
 
 #### Expected Results After Fixes:
-1. **No more 24-hour freeze**: Automatic WAL checkpointing prevents lock accumulation
+1. **No more 24-hour freeze**: Automatic background maintenance every 6 hours prevents lock accumulation
 2. **Lower CPU usage**: Token caching reduces JWT verification overhead by ~80%
-3. **Better stability**: PM2 automatic restart on memory threshold
-4. **Predictable restarts**: Daily 3 AM restart prevents long-term drift
+3. **Better stability**: PM2 automatic restart on memory threshold (300MB)
+4. **Zero manual intervention**: Background service handles all database maintenance automatically
+5. **Continuous operation**: No need for daily restarts or cron jobs
 
 #### Monitoring Recommendations:
 

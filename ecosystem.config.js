@@ -22,11 +22,11 @@ module.exports = {
       min_uptime: '10s', // Consider app online after 10 seconds
       max_restarts: 10, // Max restarts within 1 minute
 
-      // Automatic restart schedule (optional - restart daily at 3 AM)
-      cron_restart: '0 3 * * *',
-
       // Kill timeout - give app 10 seconds to gracefully shutdown
       kill_timeout: 10000,
+
+      // Note: No cron_restart needed - background maintenance service handles DB optimization
+      // Automatic WAL checkpoints run every 6 hours via instrumentation.ts
     },
   ],
 };

@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { checkpointWal, optimizeDb } from '@/lib/db';
 import { getSession } from '@/lib/auth';
+import maintenanceService from '@/lib/maintenance-service';
 
 /**
  * Database maintenance endpoint
- * Performs WAL checkpoint and optional optimization
- * Should be called periodically via cron job on Raspberry Pi
+ * Performs manual WAL checkpoint and optional optimization
+ * Background service automatically handles periodic maintenance
  */
 export async function POST(request: Request) {
   try {
@@ -19,7 +20,8 @@ export async function POST(request: Request) {
     const { operation } = body;
 
     if (operation === 'checkpoint') {
-      // Perform WAL checkpoint
+      // Manual WAL checkpoint trigger
+      maintenanceService.triggerCheckpoint();
       const result = checkpointWal();
 
       return NextResponse.json({
@@ -27,16 +29,17 @@ export async function POST(request: Request) {
         operation: 'checkpoint',
         framesCheckpointed: result.framesCheckpointed,
         framesInWal: result.framesInWal,
-        message: 'WAL checkpoint completed',
+        message: 'Manual WAL checkpoint completed',
       });
     } else if (operation === 'optimize') {
-      // Optimize database (ANALYZE)
+      // Manual optimization trigger
+      maintenanceService.triggerOptimization();
       optimizeDb();
 
       return NextResponse.json({
         success: true,
         operation: 'optimize',
-        message: 'Database optimization completed',
+        message: 'Manual database optimization completed',
       });
     } else {
       return NextResponse.json(
@@ -57,7 +60,7 @@ export async function POST(request: Request) {
 }
 
 /**
- * GET endpoint to check database status
+ * GET endpoint to check database and service status
  */
 export async function GET() {
   try {
@@ -72,8 +75,16 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      walFrames: walStatus.framesInWal,
-      lastCheckpoint: new Date().toISOString(),
+      backgroundService: {
+        running: maintenanceService.isActive(),
+        checkpointIntervalHours: 6,
+        optimizeIntervalHours: 24,
+      },
+      database: {
+        walFrames: walStatus.framesInWal,
+        walFramesCheckpointed: walStatus.framesCheckpointed,
+      },
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
     console.error('[DB Maintenance] Status check error:', error);
