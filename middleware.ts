@@ -2,6 +2,38 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { verifySession } from './lib/auth';
 
+// Simple in-memory cache for token verification (Edge Runtime compatible)
+// Cache tokens for 5 minutes to reduce JWT verification overhead
+const tokenCache = new Map<string, { valid: boolean; expiry: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function isTokenCachedValid(token: string): boolean | null {
+  const cached = tokenCache.get(token);
+  if (!cached) return null;
+
+  // Check if cache entry is still valid
+  if (Date.now() > cached.expiry) {
+    tokenCache.delete(token);
+    return null;
+  }
+
+  return cached.valid;
+}
+
+function cacheToken(token: string, valid: boolean): void {
+  // Limit cache size to prevent memory issues
+  if (tokenCache.size > 1000) {
+    // Remove oldest 200 entries
+    const entries = Array.from(tokenCache.entries());
+    entries.slice(0, 200).forEach(([key]) => tokenCache.delete(key));
+  }
+
+  tokenCache.set(token, {
+    valid,
+    expiry: Date.now() + CACHE_TTL,
+  });
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -18,36 +50,43 @@ export async function middleware(request: NextRequest) {
 
   // If this is an API route with Bearer token, let the route handle authentication
   if (pathname.startsWith('/api/') && request.headers.get('authorization')?.startsWith('Bearer ')) {
-    console.log('[Middleware] API route with Bearer token - letting route handle auth');
     return NextResponse.next();
   }
 
   // JWT cookie authentication for web UI
   const token = request.cookies.get('session')?.value;
 
-  console.log('[Middleware]', pathname, 'Token:', token ? 'exists' : 'missing');
-
   // If no token, redirect to login
   if (!token) {
-    console.log('[Middleware] No token, redirecting to login');
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // Verify the session token
+  // Check cache first to reduce JWT verification overhead
+  const cachedValid = isTokenCachedValid(token);
+  if (cachedValid !== null) {
+    if (cachedValid) {
+      return NextResponse.next();
+    } else {
+      const response = NextResponse.redirect(new URL('/login', request.url));
+      response.cookies.delete('session');
+      return response;
+    }
+  }
+
+  // Verify the session token (not in cache)
   const session = await verifySession(token);
 
-  console.log('[Middleware] Session valid:', session ? 'yes' : 'no');
+  // Cache the result
+  cacheToken(token, session !== null);
 
   // If session is invalid, redirect to login
   if (!session) {
-    console.log('[Middleware] Invalid session, redirecting to login');
     const response = NextResponse.redirect(new URL('/login', request.url));
     response.cookies.delete('session');
     return response;
   }
 
   // Session is valid, continue
-  console.log('[Middleware] Access granted to', pathname);
   return NextResponse.next();
 }
 

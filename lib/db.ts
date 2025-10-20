@@ -104,6 +104,13 @@ function getDb(): Database.Database {
     db.pragma('journal_mode = WAL');
     db.pragma('busy_timeout = 5000');
 
+    // Configure WAL checkpointing to prevent file growth
+    // RESTART mode: checkpoint and reset WAL file to prevent accumulation
+    db.pragma('wal_autocheckpoint = 1000'); // Checkpoint every 1000 pages (~4MB)
+
+    // Enable foreign keys
+    db.pragma('foreign_keys = ON');
+
     // Create tables
     db.exec(`
       CREATE TABLE IF NOT EXISTS devices (
@@ -526,6 +533,38 @@ export function closeDb(): void {
     db.close();
     db = null;
   }
+}
+
+/**
+ * Perform WAL checkpoint to optimize database file and prevent lock accumulation
+ * Should be called periodically (e.g., via cron or scheduled task)
+ * Returns number of WAL frames checkpointed
+ */
+export function checkpointWal(): { framesCheckpointed: number; framesInWal: number } {
+  const database = getDb();
+
+  // RESTART mode: checkpoint and reset WAL file
+  const result = database.pragma('wal_checkpoint(RESTART)');
+
+  return {
+    framesCheckpointed: result[0].busy || 0,
+    framesInWal: result[0].log || 0,
+  };
+}
+
+/**
+ * Optimize database by running VACUUM and ANALYZE
+ * This should be run periodically during low-traffic periods
+ * WARNING: VACUUM requires exclusive lock and can take time
+ */
+export function optimizeDb(): void {
+  const database = getDb();
+
+  // Run ANALYZE to update query planner statistics
+  database.exec('ANALYZE');
+
+  // Optionally run VACUUM to reclaim space (can be slow, use cautiously)
+  // database.exec('VACUUM');
 }
 
 export default getDb;
