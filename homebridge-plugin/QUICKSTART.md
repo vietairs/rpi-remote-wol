@@ -94,13 +94,14 @@ sudo hb-service restart
 
 ## What You'll See in Home App
 
-### Status & Controls
-- 📱 **Device Status** - Contact sensor (shows online/offline)
-- ⚡ **Wake PC** - Tap to wake your computer
-- 💤 **Sleep PC** - Tap to put PC to sleep
-- 🔴 **Shutdown PC** - Tap to shutdown PC
+### Main Control Device (One device with 3 switches)
+- 🎮 **Gaming PC** (or your custom device name)
+  - ⚡ **Wake** - Tap to wake your computer
+  - 💤 **Sleep** - Tap to put PC to sleep
+  - 🔴 **Shutdown** - Tap to shutdown PC
 
-### Monitoring
+### Monitoring (Separate accessories)
+- 📱 **Device Status** - Contact sensor (shows online/offline)
 - 🌡️ **CPU Usage** - Temperature sensor (°C = % usage)
 - 💧 **RAM Usage** - Humidity sensor (% = % usage)
 - 🌡️ **GPU Usage** - Temperature sensor (°C = % usage)
@@ -110,10 +111,11 @@ sudo hb-service restart
 
 Try these commands:
 
-- **"Hey Siri, turn on Wake PC"** - Wake your computer
+- **"Hey Siri, turn on Wake"** - Wake your computer
+- **"Hey Siri, turn on Sleep"** - Put PC to sleep
+- **"Hey Siri, turn on Shutdown"** - Shutdown computer
 - **"Hey Siri, what's the CPU temperature?"** - Check CPU usage
 - **"Hey Siri, what's the humidity in Gaming PC?"** - Check RAM usage
-- **"Hey Siri, turn off Shutdown PC"** - Shutdown computer
 
 ## Creating Automations
 
@@ -121,14 +123,14 @@ Try these commands:
 1. Open Home app
 2. Go to **Automation** tab
 3. Create "When Time is 11:00 PM"
-4. Add action: Turn on "Sleep PC"
+4. Add action: Turn on "Sleep" (under Gaming PC)
 5. Your PC automatically sleeps at 11 PM!
 
 ### Example: Work Hours Monitor
 1. Create automation "When I arrive at Home"
 2. If "Device Status" is "Not Detected" (offline)
 3. Send notification "Your PC is offline"
-4. Turn on "Wake PC"
+4. Turn on "Wake" (under Gaming PC)
 
 ### Example: Power Monitoring
 1. Create automation based on "Power Consumption"
@@ -229,7 +231,7 @@ If PC Remote Wake is on different machine:
 ### Create Scenes
 1. Go to **Scenes** tab
 2. Create "Gaming Mode" scene
-3. Add action: Turn on "Wake PC"
+3. Add action: Turn on "Wake" (under Gaming PC)
 4. Add action: Set lights to gaming colors
 
 ### Widget Dashboard

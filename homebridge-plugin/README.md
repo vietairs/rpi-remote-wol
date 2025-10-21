@@ -89,15 +89,18 @@ Add this to your Homebridge `config.json`:
 
 Once configured and Homebridge is restarted, you'll see these accessories in the Home app:
 
-### Status & Control
-- **Device Status** - Contact Sensor (Detected = Online, Not Detected = Offline)
-- **Wake PC** - Switch (tap to wake, auto-turns off)
-- **Sleep PC** - Switch (tap to sleep, auto-turns off)
-- **Shutdown PC** - Switch (tap to shutdown, auto-turns off)
+### Main Control Device
+- **[Device Name]** - Single device with 3 switches:
+  - **Wake** - Tap to send WOL magic packet (auto-turns off)
+  - **Sleep** - Tap to put PC to sleep (auto-turns off)
+  - **Shutdown** - Tap to shutdown PC (auto-turns off)
+
+### Status
+- **[Device Name] Device Status** - Contact Sensor (Detected = Online, Not Detected = Offline)
 
 ### Monitoring
-- **CPU Usage** - Temperature Sensor (°C = % usage)
-- **RAM Usage** - Humidity Sensor (% = % usage)
+- **[Device Name] CPU Usage** - Temperature Sensor (°C = % usage)
+- **[Device Name] RAM Usage** - Humidity Sensor (% = % usage)
 - **GPU Usage** - Temperature Sensor (°C = % usage)
 - **Power Consumption** - Light Sensor (Lux = Watts)
 

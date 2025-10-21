@@ -67,14 +67,12 @@ class PCRemoteWakePlatform {
     this.log('Discovering PC Remote Wake accessories...');
 
     const accessories = [
-      new DeviceStatusAccessory(this, 'Device Status'),
-      new WakeSwitchAccessory(this, 'Wake PC'),
-      new SleepSwitchAccessory(this, 'Sleep PC'),
-      new ShutdownSwitchAccessory(this, 'Shutdown PC'),
-      new CPUAccessory(this, 'CPU Usage'),
-      new RAMAccessory(this, 'RAM Usage'),
-      new GPUAccessory(this, 'GPU Usage'),
-      new PowerAccessory(this, 'Power Consumption'),
+      new DeviceStatusAccessory(this, 'Status'),
+      new PCControlAccessory(this, 'Control'), // Single accessory with 3 buttons
+      new CPUAccessory(this, 'CPU %'),
+      new RAMAccessory(this, 'RAM %'),
+      new GPUAccessory(this, 'GPU %'),
+      new PowerAccessory(this, 'Power (W)'),
     ];
 
     this.accessories = accessories;
@@ -244,13 +242,18 @@ class BaseAccessory {
 }
 
 // Device Status Accessory (Contact Sensor)
+// Shows "Detected" when PC is online, "Not Detected" when offline
 class DeviceStatusAccessory extends BaseAccessory {
   constructor(platform, name) {
     super(platform, name, Service.ContactSensor);
+
+    // Add helpful name
+    this.service.setCharacteristic(Characteristic.Name, `${platform.deviceName} Online Status`);
   }
 
   updateFromMetrics(metrics, status) {
     const isOnline = status && status.online;
+    // Detected = PC is online, Not Detected = PC is offline
     this.service.updateCharacteristic(
       Characteristic.ContactSensorState,
       isOnline ? Characteristic.ContactSensorState.CONTACT_DETECTED : Characteristic.ContactSensorState.CONTACT_NOT_DETECTED
@@ -258,169 +261,172 @@ class DeviceStatusAccessory extends BaseAccessory {
   }
 }
 
-// Wake Switch Accessory
-class WakeSwitchAccessory extends BaseAccessory {
+// PC Control Accessory - Single device with 3 switches (Wake, Sleep, Shutdown)
+class PCControlAccessory {
   constructor(platform, name) {
-    super(platform, name, Service.Switch);
+    this.platform = platform;
+    this.log = platform.log;
+    this.name = `${platform.deviceName}`;
+    this.uuid = platform.api.hap.uuid.generate(this.name + ' Control');
 
-    this.service
+    this.accessory = new platform.api.platformAccessory(this.name, this.uuid);
+
+    this.accessory
+      .getService(Service.AccessoryInformation)
+      .setCharacteristic(Characteristic.Manufacturer, 'PC Remote Wake')
+      .setCharacteristic(Characteristic.Model, 'PC Control')
+      .setCharacteristic(Characteristic.SerialNumber, this.uuid);
+
+    // Switch 1: Wake
+    this.wakeService = this.accessory.addService(Service.Switch, 'Wake', 'wake');
+    this.wakeService
       .getCharacteristic(Characteristic.On)
-      .on('set', this.setOn.bind(this));
-  }
+      .on('set', async (value, callback) => {
+        if (value) {
+          try {
+            await this.platform.wakeDevice();
+            this.log('Wake command sent');
+            // Auto-turn off after 1 second
+            setTimeout(() => {
+              this.wakeService.updateCharacteristic(Characteristic.On, false);
+            }, 1000);
+            callback(null);
+          } catch (error) {
+            this.log.error('Failed to wake device:', error.message);
+            callback(error);
+          }
+        } else {
+          callback(null);
+        }
+      });
 
-  async setOn(value, callback) {
-    if (value) {
-      try {
-        await this.platform.wakeDevice();
-        this.log('Device wake command sent');
+    // Switch 2: Sleep
+    this.sleepService = this.accessory.addService(Service.Switch, 'Sleep', 'sleep');
+    this.sleepService
+      .getCharacteristic(Characteristic.On)
+      .on('set', async (value, callback) => {
+        if (value) {
+          try {
+            await this.platform.sleepDevice();
+            this.log('Sleep command sent');
+            // Auto-turn off after 1 second
+            setTimeout(() => {
+              this.sleepService.updateCharacteristic(Characteristic.On, false);
+            }, 1000);
+            callback(null);
+          } catch (error) {
+            this.log.error('Failed to sleep device:', error.message);
+            callback(error);
+          }
+        } else {
+          callback(null);
+        }
+      });
 
-        // Auto-turn off after 2 seconds
-        setTimeout(() => {
-          this.service.updateCharacteristic(Characteristic.On, false);
-        }, 2000);
-
-        callback(null);
-      } catch (error) {
-        this.log.error('Failed to wake device:', error.message);
-        callback(error);
-      }
-    } else {
-      callback(null);
-    }
+    // Switch 3: Shutdown
+    this.shutdownService = this.accessory.addService(Service.Switch, 'Shutdown', 'shutdown');
+    this.shutdownService
+      .getCharacteristic(Characteristic.On)
+      .on('set', async (value, callback) => {
+        if (value) {
+          try {
+            await this.platform.shutdownDevice();
+            this.log('Shutdown command sent');
+            // Auto-turn off after 1 second
+            setTimeout(() => {
+              this.shutdownService.updateCharacteristic(Characteristic.On, false);
+            }, 1000);
+            callback(null);
+          } catch (error) {
+            this.log.error('Failed to shutdown device:', error.message);
+            callback(error);
+          }
+        } else {
+          callback(null);
+        }
+      });
   }
 
   updateFromMetrics(metrics, status) {
-    // Keep switch off by default
-    this.service.updateCharacteristic(Characteristic.On, false);
-  }
-}
-
-// Sleep Switch Accessory
-class SleepSwitchAccessory extends BaseAccessory {
-  constructor(platform, name) {
-    super(platform, name, Service.Switch);
-
-    this.service
-      .getCharacteristic(Characteristic.On)
-      .on('set', this.setOn.bind(this));
-  }
-
-  async setOn(value, callback) {
-    if (value) {
-      try {
-        await this.platform.sleepDevice();
-        this.log('Device sleep command sent');
-
-        // Auto-turn off after 2 seconds
-        setTimeout(() => {
-          this.service.updateCharacteristic(Characteristic.On, false);
-        }, 2000);
-
-        callback(null);
-      } catch (error) {
-        this.log.error('Failed to sleep device:', error.message);
-        callback(error);
-      }
-    } else {
-      callback(null);
-    }
-  }
-
-  updateFromMetrics(metrics, status) {
-    // Keep switch off by default
-    this.service.updateCharacteristic(Characteristic.On, false);
-  }
-}
-
-// Shutdown Switch Accessory
-class ShutdownSwitchAccessory extends BaseAccessory {
-  constructor(platform, name) {
-    super(platform, name, Service.Switch);
-
-    this.service
-      .getCharacteristic(Characteristic.On)
-      .on('set', this.setOn.bind(this));
-  }
-
-  async setOn(value, callback) {
-    if (value) {
-      try {
-        await this.platform.shutdownDevice();
-        this.log('Device shutdown command sent');
-
-        // Auto-turn off after 2 seconds
-        setTimeout(() => {
-          this.service.updateCharacteristic(Characteristic.On, false);
-        }, 2000);
-
-        callback(null);
-      } catch (error) {
-        this.log.error('Failed to shutdown device:', error.message);
-        callback(error);
-      }
-    } else {
-      callback(null);
-    }
-  }
-
-  updateFromMetrics(metrics, status) {
-    // Keep switch off by default
-    this.service.updateCharacteristic(Characteristic.On, false);
+    // Keep all switches off by default
+    this.wakeService.updateCharacteristic(Characteristic.On, false);
+    this.sleepService.updateCharacteristic(Characteristic.On, false);
+    this.shutdownService.updateCharacteristic(Characteristic.On, false);
   }
 }
 
 // CPU Usage Accessory (Temperature Sensor)
+// Note: HomeKit doesn't have a CPU sensor type, so we use Temperature
+// The value shows as "°C" but represents CPU percentage (e.g., 45°C = 45% CPU)
 class CPUAccessory extends BaseAccessory {
   constructor(platform, name) {
     super(platform, name, Service.TemperatureSensor);
+
+    // Add helpful name that shows in some HomeKit apps
+    this.service.setCharacteristic(Characteristic.Name, `${platform.deviceName} CPU Percent`);
   }
 
   updateFromMetrics(metrics, status) {
     if (metrics && metrics.cpu !== null) {
-      // Use CPU percentage as temperature (0-100°C)
+      // Display CPU percentage as temperature (45% shows as 45°C)
       this.service.updateCharacteristic(Characteristic.CurrentTemperature, metrics.cpu);
     }
   }
 }
 
 // RAM Usage Accessory (Humidity Sensor)
+// Note: HomeKit doesn't have a RAM sensor type, so we use Humidity
+// The value shows as "%" humidity but represents RAM usage (e.g., 67% = 67% RAM used)
 class RAMAccessory extends BaseAccessory {
   constructor(platform, name) {
     super(platform, name, Service.HumiditySensor);
+
+    // Add helpful name that shows in some HomeKit apps
+    this.service.setCharacteristic(Characteristic.Name, `${platform.deviceName} RAM Percent`);
   }
 
   updateFromMetrics(metrics, status) {
     if (metrics && metrics.ram && metrics.ram.percent !== null) {
-      // Use RAM percentage as humidity (0-100%)
+      // Display RAM percentage as humidity (67% RAM shows as 67% humidity)
       this.service.updateCharacteristic(Characteristic.CurrentRelativeHumidity, metrics.ram.percent);
     }
   }
 }
 
 // GPU Usage Accessory (Temperature Sensor)
+// Note: HomeKit doesn't have a GPU sensor type, so we use Temperature
+// The value shows as "°C" but represents GPU percentage (e.g., 80°C = 80% GPU)
 class GPUAccessory extends BaseAccessory {
   constructor(platform, name) {
     super(platform, name, Service.TemperatureSensor);
+
+    // Add helpful name that shows in some HomeKit apps
+    this.service.setCharacteristic(Characteristic.Name, `${platform.deviceName} GPU Percent`);
   }
 
   updateFromMetrics(metrics, status) {
     if (metrics && metrics.gpu && metrics.gpu.usage !== null) {
-      // Use GPU percentage as temperature (0-100°C)
+      // Display GPU percentage as temperature (80% shows as 80°C)
       this.service.updateCharacteristic(Characteristic.CurrentTemperature, metrics.gpu.usage);
     }
   }
 }
 
 // Power Consumption Accessory (Light Sensor)
+// Note: HomeKit doesn't have a Power sensor type, so we use Light
+// The value shows as "lux" but represents Watts (e.g., 350 lux = 350 Watts)
 class PowerAccessory extends BaseAccessory {
   constructor(platform, name) {
     super(platform, name, Service.LightSensor);
+
+    // Add helpful name that shows in some HomeKit apps
+    this.service.setCharacteristic(Characteristic.Name, `${platform.deviceName} Power Watts`);
   }
 
   updateFromMetrics(metrics, status) {
     if (metrics && metrics.power && metrics.power.watts !== null) {
-      // Use watts as lux (0.0001 - 100000 lux range)
-      // Map 0-1000W to lux range
+      // Display Watts as Lux (350W shows as 350 lux)
+      // HomeKit light sensor range: 0.0001 - 100000 lux
       const lux = Math.max(0.0001, Math.min(metrics.power.watts, 100000));
       this.service.updateCharacteristic(Characteristic.CurrentAmbientLightLevel, lux);
     }

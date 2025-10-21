@@ -339,10 +339,12 @@ A complete Homebridge plugin is included in the `homebridge-plugin/` directory, 
 
 ### Features
 
-**Control**:
-- Wake PC (Switch)
-- Sleep PC (Switch)
-- Shutdown PC (Switch)
+**Control** (Single device with 3 switches):
+- Wake (Switch)
+- Sleep (Switch)
+- Shutdown (Switch)
+
+**Status**:
 - Device Status (Contact Sensor - online/offline)
 
 **Monitoring**:
@@ -396,10 +398,11 @@ Add to your Homebridge `config.json`:
 
 ### Siri Commands
 
-- "Hey Siri, turn on Wake PC"
+- "Hey Siri, turn on Wake"
+- "Hey Siri, turn on Sleep"
+- "Hey Siri, turn on Shutdown"
 - "Hey Siri, what's the CPU temperature?"
 - "Hey Siri, what's the humidity in Gaming PC?" (RAM usage)
-- "Hey Siri, turn on Shutdown PC"
 
 ## Windows PC Requirements
 
