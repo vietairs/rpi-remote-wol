@@ -1,7 +1,7 @@
 {
   "name": "homebridge-pc-remote-wake",
-  "version": "1.0.0",
-  "description": "Homebridge plugin for PC Remote Wake - Monitor and control your Windows PC via HomeKit",
+  "version": "2.3.1",
+  "description": "Homebridge plugin for PC Remote Wake - Monitor and control your Windows PC via HomeKit (consolidated accessory with all sensors)",
   "main": "index.js",
   "keywords": [
     "homebridge-plugin",

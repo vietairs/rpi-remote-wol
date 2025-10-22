@@ -339,19 +339,23 @@ A complete Homebridge plugin is included in the `homebridge-plugin/` directory, 
 
 ### Features
 
-**Control** (Single device with 3 switches):
-- Wake (Switch)
-- Sleep (Switch)
-- Shutdown (Switch)
+**v2.1.0+**: Single consolidated accessory with all controls and sensors appearing together on the same page in Home app.
 
-**Status**:
-- Device Status (Contact Sensor - online/offline)
+**All services in ONE device**:
+- ✅ Device Status (Contact Sensor - online/offline)
+- ✅ Wake (Switch)
+- ✅ Sleep (Switch)
+- ✅ Shutdown (Switch)
+- ✅ CPU Usage (Temperature Sensor - °C = % usage)
+- ✅ RAM Usage (Humidity Sensor - % = % usage)
+- ✅ GPU Usage (Temperature Sensor - °C = % usage)
+- ✅ Power Consumption (Light Sensor - Lux = Watts)
 
-**Monitoring**:
-- CPU Usage (Temperature Sensor - °C = % usage)
-- RAM Usage (Humidity Sensor - % = % usage)
-- GPU Usage (Temperature Sensor - °C = % usage)
-- Power Consumption (Light Sensor - Lux = Watts)
+**Key improvements over v2.0.0**:
+- All 8 services visible on the device page
+- No more scattered sensors across different categories
+- Device status visible alongside controls
+- Cleaner Home app organization
 
 ### Installation
 
@@ -394,6 +398,7 @@ Add to your Homebridge `config.json`:
 
 - **Quick Start**: See `homebridge-plugin/QUICKSTART.md`
 - **Full Documentation**: See `homebridge-plugin/README.md`
+- **Migration Guide**: See `homebridge-plugin/MIGRATION.md` (v2.0.0 → v2.1.0 upgrade)
 - **Config Schema**: See `homebridge-plugin/config.schema.json` (for Homebridge UI)
 
 ### Siri Commands
