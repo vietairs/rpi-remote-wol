@@ -150,6 +150,20 @@ export async function GET(
       value: m.power_consumption_w,
     }));
 
+    // Calculate energy consumption for the time period
+    const energyConsumption = metricsDb.getEnergyConsumption(
+      deviceId,
+      startTimestamp,
+      now
+    );
+
+    // Get power statistics
+    const powerStats = metricsDb.getPowerStats(
+      deviceId,
+      startTimestamp,
+      now
+    );
+
     return NextResponse.json({
       deviceId,
       duration,
@@ -163,6 +177,16 @@ export async function GET(
           tx: networkTx,
         },
         power,
+      },
+      energyConsumption: {
+        kWh: energyConsumption.energyKwh,
+        dataPoints: energyConsumption.dataPoints,
+      },
+      powerStats: {
+        avgWatts: powerStats.avgPowerW,
+        maxWatts: powerStats.maxPowerW,
+        minWatts: powerStats.minPowerW,
+        dataPoints: powerStats.dataPoints,
       },
     });
   } catch (error) {

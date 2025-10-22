@@ -55,6 +55,16 @@ interface HistoricalMetricsResponse {
     };
     power: Array<{ timestamp: number; value: number | null }>;
   };
+  energyConsumption: {
+    kWh: number;
+    dataPoints: number;
+  };
+  powerStats: {
+    avgWatts: number | null;
+    maxWatts: number | null;
+    minWatts: number | null;
+    dataPoints: number;
+  };
 }
 
 export default function MetricsChart({ deviceId }: MetricsChartProps) {
@@ -62,6 +72,8 @@ export default function MetricsChart({ deviceId }: MetricsChartProps) {
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [energyConsumption, setEnergyConsumption] = useState<{ kWh: number; dataPoints: number } | null>(null);
+  const [powerStats, setPowerStats] = useState<{ avgWatts: number | null; maxWatts: number | null; minWatts: number | null } | null>(null);
   const [visibleMetrics, setVisibleMetrics] = useState<MetricVisibility>({
     cpu: true,
     ram: true,
@@ -88,12 +100,16 @@ export default function MetricsChart({ deviceId }: MetricsChartProps) {
       if (data.dataPoints === 0) {
         setError('No historical data available. Metrics will appear after first collection.');
         setChartData([]);
+        setEnergyConsumption(null);
+        setPowerStats(null);
         setLoading(false);
         return;
       }
 
       const transformed = transformToChartData(data, duration);
       setChartData(transformed);
+      setEnergyConsumption(data.energyConsumption);
+      setPowerStats(data.powerStats);
     } catch (err) {
       console.error('Failed to fetch metrics:', err);
       setError(err instanceof Error ? err.message : 'Failed to load historical metrics');
@@ -388,6 +404,58 @@ export default function MetricsChart({ deviceId }: MetricsChartProps) {
         </div>
       )}
 
+      {/* Energy Consumption Stats */}
+      {energyConsumption && energyConsumption.kWh > 0 && (
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Total Energy Consumption */}
+          <div className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border border-yellow-500/40 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <h4 className="text-yellow-100 text-sm font-semibold">Total Energy</h4>
+            </div>
+            <p className="text-3xl font-bold text-white">
+              {energyConsumption.kWh.toFixed(2)}
+            </p>
+            <p className="text-yellow-200 text-xs mt-1">kWh</p>
+          </div>
+
+          {/* Average Power */}
+          {powerStats?.avgWatts !== null && (
+            <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/40 rounded-lg p-4">
+              <h4 className="text-blue-200 text-sm font-semibold mb-2">Avg Power</h4>
+              <p className="text-3xl font-bold text-white">
+                {powerStats.avgWatts.toFixed(1)}
+              </p>
+              <p className="text-blue-200 text-xs mt-1">Watts</p>
+            </div>
+          )}
+
+          {/* Max Power */}
+          {powerStats?.maxWatts !== null && (
+            <div className="bg-gradient-to-br from-red-500/20 to-pink-500/20 border border-red-500/40 rounded-lg p-4">
+              <h4 className="text-red-200 text-sm font-semibold mb-2">Peak Power</h4>
+              <p className="text-3xl font-bold text-white">
+                {powerStats.maxWatts.toFixed(1)}
+              </p>
+              <p className="text-red-200 text-xs mt-1">Watts</p>
+            </div>
+          )}
+
+          {/* Min Power */}
+          {powerStats?.minWatts !== null && (
+            <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 border border-green-500/40 rounded-lg p-4">
+              <h4 className="text-green-200 text-sm font-semibold mb-2">Min Power</h4>
+              <p className="text-3xl font-bold text-white">
+                {powerStats.minWatts.toFixed(1)}
+              </p>
+              <p className="text-green-200 text-xs mt-1">Watts</p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Metric Toggles */}
       <div className="flex flex-wrap gap-3 mb-6">
         {Object.entries(visibleMetrics).map(([key, visible]) => {
@@ -532,6 +600,11 @@ export default function MetricsChart({ deviceId }: MetricsChartProps) {
         <p className="text-blue-200 text-xs">
           💡 Chart shows normalized metrics (0-100 scale). Network values are scaled from 0-1000 Mbps, Power from 0-500W.
           Hover over lines for actual values. Click legend items or checkboxes to toggle metrics.
+          {energyConsumption && energyConsumption.kWh > 0 && (
+            <span className="block mt-1">
+              ⚡ Energy consumption calculated using trapezoidal integration for accurate kWh measurement over the selected time period.
+            </span>
+          )}
         </p>
       </div>
     </div>
