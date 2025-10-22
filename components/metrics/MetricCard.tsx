@@ -1,11 +1,23 @@
+import { Cpu, MemoryStick, Gpu, ArrowDownToLine, ArrowUpFromLine, Zap, LucideIcon } from 'lucide-react';
+import { metricIconColors, MetricType } from '@/lib/iconColors';
+
 interface MetricCardProps {
   title: string;
   value: number | null;
   unit: string;
   max?: number;
-  icon: string;
+  icon: MetricType;
   subtitle?: string;
 }
+
+const iconMap: Record<MetricType, LucideIcon> = {
+  cpu: Cpu,
+  ram: MemoryStick,
+  gpu: Gpu,
+  networkRx: ArrowDownToLine,
+  networkTx: ArrowUpFromLine,
+  power: Zap,
+};
 
 export default function MetricCard({
   title,
@@ -16,6 +28,8 @@ export default function MetricCard({
   subtitle,
 }: MetricCardProps) {
   const percentage = value !== null ? Math.min((value / max) * 100, 100) : 0;
+  const IconComponent = iconMap[icon];
+  const iconColorClass = metricIconColors[icon];
 
   // Color based on percentage
   const getColor = () => {
@@ -37,7 +51,7 @@ export default function MetricCard({
       <div className="flex items-center justify-between mb-3">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-2xl">{icon}</span>
+            <IconComponent className={`w-6 h-6 ${iconColorClass}`} strokeWidth={2} />
             <h3 className="text-white font-semibold text-lg">{title}</h3>
           </div>
           {subtitle && (

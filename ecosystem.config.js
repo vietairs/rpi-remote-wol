@@ -25,8 +25,9 @@ module.exports = {
       // Kill timeout - give app 10 seconds to gracefully shutdown
       kill_timeout: 10000,
 
-      // Note: No cron_restart needed - background maintenance service handles DB optimization
-      // Automatic WAL checkpoints run every 6 hours via instrumentation.ts
+      // Scheduled restart to prevent resource accumulation and stalling
+      // Restarts daily at 3 AM (background maintenance handles DB optimization)
+      cron_restart: '0 3 * * *', // Daily at 3:00 AM
     },
   ],
 };

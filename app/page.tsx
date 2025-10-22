@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { Activity } from 'lucide-react';
 import MetricsPanel from '@/components/metrics/MetricsPanel';
 
 interface Device {
@@ -1006,10 +1007,11 @@ export default function Home() {
                       {device.ssh_username && device.ssh_password && deviceStatuses.get(device.id)?.online && (
                         <button
                           onClick={() => setMetricsDeviceId(device.id)}
-                          className="flex-1 px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 text-purple-100 text-xs font-medium rounded transition-colors"
+                          className="flex-1 px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 text-purple-100 text-xs font-medium rounded transition-colors flex items-center gap-1.5 justify-center"
                           title="View system metrics"
                         >
-                          📊 Metrics
+                          <Activity className="w-4 h-4" />
+                          Metrics
                         </button>
                       )}
                     </div>
