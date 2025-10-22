@@ -11,7 +11,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { Clock, Clock1, Clock6, RefreshCw } from 'lucide-react';
+import { Clock, Clock1, Clock6, Calendar, CalendarDays, CalendarRange, CalendarClock, RefreshCw } from 'lucide-react';
 import { metricLineColors } from '@/lib/iconColors';
 
 interface MetricsChartProps {
@@ -39,7 +39,7 @@ interface MetricVisibility {
   power: boolean;
 }
 
-type TimeRange = '1h' | '6h' | '24h';
+type TimeRange = '1h' | '6h' | '24h' | '7d' | '30d' | '90d' | '365d';
 
 interface HistoricalMetricsResponse {
   deviceId: number;
@@ -172,16 +172,34 @@ export default function MetricsChart({ deviceId }: MetricsChartProps) {
     switch (timeRange) {
       case '1h':
       case '6h':
+        // Hour/minute for short durations
         return date.toLocaleTimeString('en-US', {
           hour: '2-digit',
           minute: '2-digit'
         });
       case '24h':
+        // Date + time for 1 day
         return date.toLocaleString('en-US', {
           month: '2-digit',
           day: '2-digit',
           hour: '2-digit',
           minute: '2-digit'
+        });
+      case '7d':
+      case '30d':
+        // Date + time for week/month
+        return date.toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      case '90d':
+      case '365d':
+        // Date only for long durations
+        return date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric'
         });
       default:
         return date.toLocaleTimeString();
@@ -282,7 +300,7 @@ export default function MetricsChart({ deviceId }: MetricsChartProps) {
         <h3 className="text-xl font-bold text-white">Historical Trends</h3>
 
         {/* Time Range Selector */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setDuration('1h')}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -315,6 +333,50 @@ export default function MetricsChart({ deviceId }: MetricsChartProps) {
           >
             <Clock className="w-4 h-4" />
             24h
+          </button>
+          <button
+            onClick={() => setDuration('7d')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              duration === '7d'
+                ? 'bg-blue-500 text-white'
+                : 'bg-white/10 text-blue-200 hover:bg-white/20'
+            }`}
+          >
+            <CalendarDays className="w-4 h-4" />
+            Week
+          </button>
+          <button
+            onClick={() => setDuration('30d')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              duration === '30d'
+                ? 'bg-blue-500 text-white'
+                : 'bg-white/10 text-blue-200 hover:bg-white/20'
+            }`}
+          >
+            <Calendar className="w-4 h-4" />
+            Month
+          </button>
+          <button
+            onClick={() => setDuration('90d')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              duration === '90d'
+                ? 'bg-blue-500 text-white'
+                : 'bg-white/10 text-blue-200 hover:bg-white/20'
+            }`}
+          >
+            <CalendarRange className="w-4 h-4" />
+            Quarter
+          </button>
+          <button
+            onClick={() => setDuration('365d')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              duration === '365d'
+                ? 'bg-blue-500 text-white'
+                : 'bg-white/10 text-blue-200 hover:bg-white/20'
+            }`}
+          >
+            <CalendarClock className="w-4 h-4" />
+            Year
           </button>
         </div>
       </div>

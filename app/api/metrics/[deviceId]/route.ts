@@ -3,11 +3,11 @@ import { verifyApiKeyHeader, getSession } from '@/lib/auth';
 import { deviceDb, metricsDb, type SystemMetrics } from '@/lib/db';
 
 /**
- * GET /api/metrics/[deviceId]?duration=1h|6h|24h
+ * GET /api/metrics/[deviceId]?duration=1h|6h|24h|7d|30d|90d|365d
  * Retrieves historical metrics for a device
  *
  * Query params:
- * - duration: "1h", "6h", "24h" (default: "24h")
+ * - duration: "1h", "6h", "24h", "7d", "30d", "90d", "365d" (default: "24h")
  *
  * Response:
  * {
@@ -69,9 +69,21 @@ export async function GET(
       case '24h':
         startTimestamp = now - 24 * 3600;
         break;
+      case '7d':
+        startTimestamp = now - 7 * 24 * 3600;
+        break;
+      case '30d':
+        startTimestamp = now - 30 * 24 * 3600;
+        break;
+      case '90d':
+        startTimestamp = now - 90 * 24 * 3600;
+        break;
+      case '365d':
+        startTimestamp = now - 365 * 24 * 3600;
+        break;
       default:
         return NextResponse.json(
-          { error: 'Invalid duration. Use "1h", "6h", or "24h"' },
+          { error: 'Invalid duration. Use "1h", "6h", "24h", "7d", "30d", "90d", or "365d"' },
           { status: 400 }
         );
     }
