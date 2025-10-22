@@ -638,11 +638,35 @@ export const metricsDb = {
     return aggregates.map((agg) => {
       const dayStart = agg.day_timestamp;
       const dayEnd = dayStart + 86400;
-      const { energyKwh } = metricsDb.getEnergyConsumption(deviceId, dayStart, dayEnd);
+
+      // Calculate energy consumption inline to avoid circular dependency
+      const database = getDb();
+      const energyStmt = database.prepare(`
+        SELECT power_consumption_w, timestamp
+        FROM system_metrics
+        WHERE device_id = ? AND timestamp >= ? AND timestamp <= ?
+        AND power_consumption_w IS NOT NULL
+        ORDER BY timestamp ASC
+      `);
+
+      const energyMetrics = energyStmt.all(deviceId, dayStart, dayEnd) as Array<{
+        power_consumption_w: number;
+        timestamp: number;
+      }>;
+
+      let totalEnergyWh = 0;
+      if (energyMetrics.length >= 2) {
+        for (let i = 0; i < energyMetrics.length - 1; i++) {
+          const p1 = energyMetrics[i].power_consumption_w;
+          const p2 = energyMetrics[i + 1].power_consumption_w;
+          const dt = (energyMetrics[i + 1].timestamp - energyMetrics[i].timestamp) / 3600;
+          totalEnergyWh += ((p1 + p2) / 2) * dt;
+        }
+      }
 
       return {
         ...agg,
-        total_energy_kwh: energyKwh > 0 ? energyKwh : null,
+        total_energy_kwh: totalEnergyWh > 0 ? totalEnergyWh / 1000 : null,
       };
     });
   },
