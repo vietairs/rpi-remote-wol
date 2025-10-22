@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyApiKeyHeader, getSession } from '@/lib/auth';
-import { deviceDb, metricsDb } from '@/lib/db';
+import { deviceDb, metricsDb, type SystemMetrics } from '@/lib/db';
 
 /**
  * GET /api/metrics/[deviceId]?duration=1h|6h|24h
@@ -108,32 +108,32 @@ export async function GET(
     }
 
     // Format data for charting
-    const cpu = historicalMetrics.map(m => ({
+    const cpu = historicalMetrics.map((m: SystemMetrics) => ({
       timestamp: m.timestamp,
       value: m.cpu_percent,
     }));
 
-    const ram = historicalMetrics.map(m => ({
+    const ram = historicalMetrics.map((m: SystemMetrics) => ({
       timestamp: m.timestamp,
       value: m.ram_percent,
     }));
 
-    const gpu = historicalMetrics.map(m => ({
+    const gpu = historicalMetrics.map((m: SystemMetrics) => ({
       timestamp: m.timestamp,
       value: m.gpu_percent,
     }));
 
-    const networkRx = historicalMetrics.map(m => ({
+    const networkRx = historicalMetrics.map((m: SystemMetrics) => ({
       timestamp: m.timestamp,
       value: m.network_rx_mbps,
     }));
 
-    const networkTx = historicalMetrics.map(m => ({
+    const networkTx = historicalMetrics.map((m: SystemMetrics) => ({
       timestamp: m.timestamp,
       value: m.network_tx_mbps,
     }));
 
-    const power = historicalMetrics.map(m => ({
+    const power = historicalMetrics.map((m: SystemMetrics) => ({
       timestamp: m.timestamp,
       value: m.power_consumption_w,
     }));
