@@ -670,46 +670,48 @@ export const metricsDb = {
       };
     });
   },
-
-  /**
-   * Get aggregated metrics with automatic resolution selection based on time range
-   * - Less than 48 hours: Raw data (5-minute intervals)
-   * - 48 hours to 30 days: Hourly aggregates
-   * - More than 30 days: Daily aggregates
-   */
-  getAdaptiveAggregates: (
-    deviceId: number,
-    startTimestamp: number,
-    endTimestamp: number
-  ): {
-    resolution: 'raw' | 'hourly' | 'daily';
-    data: SystemMetrics[] | ReturnType<typeof metricsDb.getHourlyAggregates> | ReturnType<typeof metricsDb.getDailyAggregates>;
-  } => {
-    const rangeSeconds = endTimestamp - startTimestamp;
-    const twoDays = 2 * 24 * 3600;
-    const thirtyDays = 30 * 24 * 3600;
-
-    if (rangeSeconds <= twoDays) {
-      // Less than 48 hours: return raw data
-      return {
-        resolution: 'raw',
-        data: metricsDb.getHistoricalForDevice(deviceId, startTimestamp, endTimestamp),
-      };
-    } else if (rangeSeconds <= thirtyDays) {
-      // 48 hours to 30 days: return hourly aggregates
-      return {
-        resolution: 'hourly',
-        data: metricsDb.getHourlyAggregates(deviceId, startTimestamp, endTimestamp),
-      };
-    } else {
-      // More than 30 days: return daily aggregates
-      return {
-        resolution: 'daily',
-        data: metricsDb.getDailyAggregates(deviceId, startTimestamp, endTimestamp),
-      };
-    }
-  },
 };
+
+/**
+ * Get aggregated metrics with automatic resolution selection based on time range
+ * - Less than 48 hours: Raw data (5-minute intervals)
+ * - 48 hours to 30 days: Hourly aggregates
+ * - More than 30 days: Daily aggregates
+ *
+ * Note: Defined outside metricsDb to avoid circular dependency
+ */
+export function getAdaptiveAggregates(
+  deviceId: number,
+  startTimestamp: number,
+  endTimestamp: number
+): {
+  resolution: 'raw' | 'hourly' | 'daily';
+  data: SystemMetrics[] | ReturnType<typeof metricsDb.getHourlyAggregates> | ReturnType<typeof metricsDb.getDailyAggregates>;
+} {
+  const rangeSeconds = endTimestamp - startTimestamp;
+  const twoDays = 2 * 24 * 3600;
+  const thirtyDays = 30 * 24 * 3600;
+
+  if (rangeSeconds <= twoDays) {
+    // Less than 48 hours: return raw data
+    return {
+      resolution: 'raw',
+      data: metricsDb.getHistoricalForDevice(deviceId, startTimestamp, endTimestamp),
+    };
+  } else if (rangeSeconds <= thirtyDays) {
+    // 48 hours to 30 days: return hourly aggregates
+    return {
+      resolution: 'hourly',
+      data: metricsDb.getHourlyAggregates(deviceId, startTimestamp, endTimestamp),
+    };
+  } else {
+    // More than 30 days: return daily aggregates
+    return {
+      resolution: 'daily',
+      data: metricsDb.getDailyAggregates(deviceId, startTimestamp, endTimestamp),
+    };
+  }
+}
 
 // Export close function for cleanup
 export function closeDb(): void {
