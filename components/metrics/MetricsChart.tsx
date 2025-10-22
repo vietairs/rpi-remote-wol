@@ -422,7 +422,7 @@ export default function MetricsChart({ deviceId }: MetricsChartProps) {
           </div>
 
           {/* Average Power */}
-          {powerStats?.avgWatts !== null && powerStats.avgWatts !== undefined && (
+          {powerStats && powerStats.avgWatts !== null && powerStats.avgWatts !== undefined && (
             <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/40 rounded-lg p-4">
               <h4 className="text-blue-200 text-sm font-semibold mb-2">Avg Power</h4>
               <p className="text-3xl font-bold text-white">
@@ -433,7 +433,7 @@ export default function MetricsChart({ deviceId }: MetricsChartProps) {
           )}
 
           {/* Max Power */}
-          {powerStats?.maxWatts !== null && powerStats.maxWatts !== undefined && (
+          {powerStats && powerStats.maxWatts !== null && powerStats.maxWatts !== undefined && (
             <div className="bg-gradient-to-br from-red-500/20 to-pink-500/20 border border-red-500/40 rounded-lg p-4">
               <h4 className="text-red-200 text-sm font-semibold mb-2">Peak Power</h4>
               <p className="text-3xl font-bold text-white">
@@ -444,7 +444,7 @@ export default function MetricsChart({ deviceId }: MetricsChartProps) {
           )}
 
           {/* Min Power */}
-          {powerStats?.minWatts !== null && powerStats.minWatts !== undefined && (
+          {powerStats && powerStats.minWatts !== null && powerStats.minWatts !== undefined && (
             <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 border border-green-500/40 rounded-lg p-4">
               <h4 className="text-green-200 text-sm font-semibold mb-2">Min Power</h4>
               <p className="text-3xl font-bold text-white">
