@@ -525,6 +525,166 @@ export const metricsDb = {
       dataPoints: result.count,
     };
   },
+
+  /**
+   * Aggregate metrics into hourly averages for a time period
+   * Useful for reducing data points while maintaining trends
+   * Returns averaged metrics grouped by hour
+   */
+  getHourlyAggregates: (
+    deviceId: number,
+    startTimestamp: number,
+    endTimestamp: number
+  ): Array<{
+    hour_timestamp: number;
+    avg_cpu_percent: number | null;
+    avg_ram_percent: number | null;
+    avg_gpu_percent: number | null;
+    avg_network_rx_mbps: number | null;
+    avg_network_tx_mbps: number | null;
+    avg_power_consumption_w: number | null;
+    data_points: number;
+  }> => {
+    const database = getDb();
+    const stmt = database.prepare(`
+      SELECT
+        (timestamp / 3600) * 3600 as hour_timestamp,
+        AVG(cpu_percent) as avg_cpu_percent,
+        AVG(ram_percent) as avg_ram_percent,
+        AVG(gpu_percent) as avg_gpu_percent,
+        AVG(network_rx_mbps) as avg_network_rx_mbps,
+        AVG(network_tx_mbps) as avg_network_tx_mbps,
+        AVG(power_consumption_w) as avg_power_consumption_w,
+        COUNT(*) as data_points
+      FROM system_metrics
+      WHERE device_id = ? AND timestamp >= ? AND timestamp <= ?
+      GROUP BY hour_timestamp
+      ORDER BY hour_timestamp ASC
+    `);
+
+    return stmt.all(deviceId, startTimestamp, endTimestamp) as Array<{
+      hour_timestamp: number;
+      avg_cpu_percent: number | null;
+      avg_ram_percent: number | null;
+      avg_gpu_percent: number | null;
+      avg_network_rx_mbps: number | null;
+      avg_network_tx_mbps: number | null;
+      avg_power_consumption_w: number | null;
+      data_points: number;
+    }>;
+  },
+
+  /**
+   * Aggregate metrics into daily averages for a time period
+   * Useful for long-term historical trends (months/years)
+   * Returns averaged metrics grouped by day
+   */
+  getDailyAggregates: (
+    deviceId: number,
+    startTimestamp: number,
+    endTimestamp: number
+  ): Array<{
+    day_timestamp: number;
+    avg_cpu_percent: number | null;
+    max_cpu_percent: number | null;
+    avg_ram_percent: number | null;
+    max_ram_percent: number | null;
+    avg_gpu_percent: number | null;
+    max_gpu_percent: number | null;
+    avg_network_rx_mbps: number | null;
+    avg_network_tx_mbps: number | null;
+    avg_power_consumption_w: number | null;
+    max_power_consumption_w: number | null;
+    total_energy_kwh: number | null;
+    data_points: number;
+  }> => {
+    const database = getDb();
+    const stmt = database.prepare(`
+      SELECT
+        (timestamp / 86400) * 86400 as day_timestamp,
+        AVG(cpu_percent) as avg_cpu_percent,
+        MAX(cpu_percent) as max_cpu_percent,
+        AVG(ram_percent) as avg_ram_percent,
+        MAX(ram_percent) as max_ram_percent,
+        AVG(gpu_percent) as avg_gpu_percent,
+        MAX(gpu_percent) as max_gpu_percent,
+        AVG(network_rx_mbps) as avg_network_rx_mbps,
+        AVG(network_tx_mbps) as avg_network_tx_mbps,
+        AVG(power_consumption_w) as avg_power_consumption_w,
+        MAX(power_consumption_w) as max_power_consumption_w,
+        COUNT(*) as data_points
+      FROM system_metrics
+      WHERE device_id = ? AND timestamp >= ? AND timestamp <= ?
+      GROUP BY day_timestamp
+      ORDER BY day_timestamp ASC
+    `);
+
+    const aggregates = stmt.all(deviceId, startTimestamp, endTimestamp) as Array<{
+      day_timestamp: number;
+      avg_cpu_percent: number | null;
+      max_cpu_percent: number | null;
+      avg_ram_percent: number | null;
+      max_ram_percent: number | null;
+      avg_gpu_percent: number | null;
+      max_gpu_percent: number | null;
+      avg_network_rx_mbps: number | null;
+      avg_network_tx_mbps: number | null;
+      avg_power_consumption_w: number | null;
+      max_power_consumption_w: number | null;
+      data_points: number;
+    }>;
+
+    // Calculate energy consumption for each day using detailed query
+    return aggregates.map((agg) => {
+      const dayStart = agg.day_timestamp;
+      const dayEnd = dayStart + 86400;
+      const { energyKwh } = metricsDb.getEnergyConsumption(deviceId, dayStart, dayEnd);
+
+      return {
+        ...agg,
+        total_energy_kwh: energyKwh > 0 ? energyKwh : null,
+      };
+    });
+  },
+
+  /**
+   * Get aggregated metrics with automatic resolution selection based on time range
+   * - Less than 48 hours: Raw data (5-minute intervals)
+   * - 48 hours to 30 days: Hourly aggregates
+   * - More than 30 days: Daily aggregates
+   */
+  getAdaptiveAggregates: (
+    deviceId: number,
+    startTimestamp: number,
+    endTimestamp: number
+  ): {
+    resolution: 'raw' | 'hourly' | 'daily';
+    data: Array<any>;
+  } => {
+    const rangeSeconds = endTimestamp - startTimestamp;
+    const twoDays = 2 * 24 * 3600;
+    const thirtyDays = 30 * 24 * 3600;
+
+    if (rangeSeconds <= twoDays) {
+      // Less than 48 hours: return raw data
+      return {
+        resolution: 'raw',
+        data: metricsDb.getHistoricalForDevice(deviceId, startTimestamp, endTimestamp),
+      };
+    } else if (rangeSeconds <= thirtyDays) {
+      // 48 hours to 30 days: return hourly aggregates
+      return {
+        resolution: 'hourly',
+        data: metricsDb.getHourlyAggregates(deviceId, startTimestamp, endTimestamp),
+      };
+    } else {
+      // More than 30 days: return daily aggregates
+      return {
+        resolution: 'daily',
+        data: metricsDb.getDailyAggregates(deviceId, startTimestamp, endTimestamp),
+      };
+    }
+  },
 };
 
 // Export close function for cleanup

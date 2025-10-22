@@ -39,6 +39,7 @@ openssl rand -base64 32
 
 # Create .env file with:
 JWT_SECRET=<generated-secret>
+METRICS_RETENTION_DAYS=365  # Optional: Default is 365 days (1 year)
 ```
 
 ### Database Location
@@ -156,7 +157,24 @@ middleware.ts         # Dual auth: JWT cookies + API key Bearer tokens
 - `GET /api/metrics/[deviceId]` - Retrieve metrics history (last 24h by default)
 - `GET /api/metrics/[deviceId]/latest` - Get most recent metrics
 - `GET /api/metrics/[deviceId]/energy` - Energy consumption stats
-- `POST /api/metrics/cleanup` - Delete old metrics (>7 days)
+- `POST /api/metrics/cleanup` - Delete old metrics based on retention policy
+  - Default retention: 365 days (configurable via `METRICS_RETENTION_DAYS` env var)
+  - Supports query parameter: `?days=N` to override retention (min: 1, max: 3650 days)
+  - Returns `{ deleted, cleanedAt, retentionDays }`
+
+**Data Aggregation** ([lib/db.ts:metricsDb](lib/db.ts)):
+- `getHourlyAggregates()` - Aggregate raw data into hourly averages for space efficiency
+- `getDailyAggregates()` - Aggregate raw data into daily averages for long-term trends
+- `getAdaptiveAggregates()` - Automatically selects resolution based on time range:
+  - < 48 hours: Raw data (5-minute intervals)
+  - 48 hours to 30 days: Hourly aggregates
+  - > 30 days: Daily aggregates (with energy totals)
+
+**Storage Estimates** (with 5-minute collection intervals):
+- 1 month: ~8,640 data points (~500KB)
+- 1 year: ~105,000 data points (~6MB)
+- 5 years: ~525,000 data points (~30MB)
+- Note: Data aggregation can reduce storage by 90% for old data while maintaining trends
 - Metrics collected:
   - CPU usage (percentage)
   - RAM usage (used/total GB, percentage)
