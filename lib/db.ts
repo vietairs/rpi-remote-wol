@@ -659,7 +659,7 @@ export const metricsDb = {
     endTimestamp: number
   ): {
     resolution: 'raw' | 'hourly' | 'daily';
-    data: Array<any>;
+    data: SystemMetrics[] | ReturnType<typeof metricsDb.getHourlyAggregates> | ReturnType<typeof metricsDb.getDailyAggregates>;
   } => {
     const rangeSeconds = endTimestamp - startTimestamp;
     const twoDays = 2 * 24 * 3600;
