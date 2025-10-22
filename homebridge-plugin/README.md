@@ -87,22 +87,27 @@ Add this to your Homebridge `config.json`:
 
 ## HomeKit Accessories
 
-Once configured and Homebridge is restarted, you'll see these accessories in the Home app:
+**v2.1.0+ uses a consolidated accessory structure.** All controls and sensors appear together on the same device page in the Home app.
 
-### Main Control Device
-- **[Device Name]** - Single device with 3 switches:
-  - **Wake** - Tap to send WOL magic packet (auto-turns off)
-  - **Sleep** - Tap to put PC to sleep (auto-turns off)
-  - **Shutdown** - Tap to shutdown PC (auto-turns off)
+Once configured and Homebridge is restarted, you'll see **ONE consolidated accessory** in the Home app with all services:
 
-### Status
-- **[Device Name] Device Status** - Contact Sensor (Detected = Online, Not Detected = Offline)
+### Single Consolidated Device: "[Device Name]"
 
-### Monitoring
-- **[Device Name] CPU Usage** - Temperature Sensor (°C = % usage)
-- **[Device Name] RAM Usage** - Humidity Sensor (% = % usage)
-- **GPU Usage** - Temperature Sensor (°C = % usage)
-- **Power Consumption** - Light Sensor (Lux = Watts)
+**Control Switches** (automatically turn off after 1 second):
+- ✅ **Wake** - Send WOL magic packet
+- ✅ **Sleep** - Put PC to sleep via SSH
+- ✅ **Shutdown** - Shut down PC via SSH
+
+**Status & Monitoring** (updated every 30 seconds):
+- ✅ **Device Status** - Contact Sensor (Detected = Online, Not Detected = Offline)
+- ✅ **CPU %** - Temperature Sensor (0-100°C = 0-100%)
+- ✅ **RAM %** - Humidity Sensor (0-100% = 0-100% RAM usage)
+- ✅ **GPU %** - Temperature Sensor (0-100°C = 0-100%)
+- ✅ **Power (W)** - Light Sensor (Lux = Watts)
+
+**All 8 services appear together on the device page** - no more hunting through separate sensor categories!
+
+> **Note:** If upgrading from v2.0.0, see [MIGRATION.md](MIGRATION.md) for upgrade instructions.
 
 ## Usage Examples
 
@@ -114,9 +119,12 @@ Once configured and Homebridge is restarted, you'll see these accessories in the
 5. View power consumption in the light sensor
 
 ### Siri Commands
-- "Hey Siri, turn on Wake PC"
-- "Hey Siri, what's the temperature of Gaming PC CPU Usage?"
-- "Hey Siri, what's the humidity in Gaming PC RAM Usage?"
+- "Hey Siri, turn on Wake" - Wake the PC
+- "Hey Siri, turn on Sleep" - Put PC to sleep
+- "Hey Siri, turn on Shutdown" - Shut down PC
+- "Hey Siri, what's the CPU temperature?" - Check CPU usage (0-100°C = 0-100%)
+- "Hey Siri, what's the humidity?" - Check RAM usage (0-100%)
+- "Hey Siri, is the PC online?" - Check device status (contact sensor)
 
 ### Automations
 Create automations based on PC status:

@@ -29,22 +29,6 @@
         "placeholder": "pcw_xxxxxxxxxxxxx",
         "description": "API key generated from the PC Remote Wake web UI (Settings → API Keys)"
       },
-      "deviceId": {
-        "title": "Device ID",
-        "type": "integer",
-        "required": true,
-        "minimum": 1,
-        "placeholder": "1",
-        "description": "The device ID from the PC Remote Wake web UI (numeric ID)"
-      },
-      "deviceName": {
-        "title": "Device Name",
-        "type": "string",
-        "default": "PC",
-        "required": false,
-        "placeholder": "Gaming PC",
-        "description": "A friendly name for your PC (used as prefix for all accessories)"
-      },
       "pollingInterval": {
         "title": "Polling Interval (seconds)",
         "type": "integer",
@@ -68,10 +52,8 @@
     },
     {
       "type": "section",
-      "title": "Device Configuration",
+      "title": "Polling Configuration",
       "items": [
-        "deviceId",
-        "deviceName",
         "pollingInterval"
       ]
     },
@@ -81,7 +63,7 @@
     },
     {
       "type": "help",
-      "helpvalue": "<p><strong>How to find your Device ID:</strong></p><ol><li>Open PC Remote Wake web UI</li><li>Look at your saved devices list</li><li>The device ID is the numeric identifier (1, 2, 3, etc.)</li></ol>"
+      "helpvalue": "<p><strong>Device Discovery:</strong></p><p>The plugin will automatically discover all devices registered in the PC Remote Wake web UI. No need to configure device IDs manually!</p>"
     }
   ]
 }
