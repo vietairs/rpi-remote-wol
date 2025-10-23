@@ -298,11 +298,11 @@ export default function MetricsChart({ deviceId }: MetricsChartProps) {
 
   if (loading) {
     return (
-      <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20 mt-6">
-        <div className="flex items-center justify-center py-12">
+      <div className="bg-white/10 backdrop-blur-lg rounded-xl p-4 sm:p-6 border border-white/20 mt-6">
+        <div className="flex items-center justify-center py-8 sm:py-12">
           <div className="text-center">
-            <RefreshCw className="animate-spin h-12 w-12 text-blue-400 mx-auto mb-4" />
-            <p className="text-white font-medium">Loading chart data...</p>
+            <RefreshCw className="animate-spin h-10 w-10 sm:h-12 sm:w-12 text-blue-400 mx-auto mb-4" />
+            <p className="text-white font-medium text-sm sm:text-base">Loading chart data...</p>
           </div>
         </div>
       </div>
@@ -310,7 +310,7 @@ export default function MetricsChart({ deviceId }: MetricsChartProps) {
   }
 
   return (
-    <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20 mt-6">
+    <div className="bg-white/10 backdrop-blur-lg rounded-xl p-4 sm:p-6 border border-white/20 mt-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <h3 className="text-xl font-bold text-white">Historical Trends</h3>
@@ -406,16 +406,16 @@ export default function MetricsChart({ deviceId }: MetricsChartProps) {
 
       {/* Energy Consumption Stats */}
       {energyConsumption && energyConsumption.kWh > 0 && (
-        <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {/* Total Energy Consumption */}
-          <div className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border border-yellow-500/40 rounded-lg p-4">
+          <div className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border border-yellow-500/40 rounded-lg p-3 sm:p-4">
             <div className="flex items-center gap-2 mb-2">
-              <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              <h4 className="text-yellow-100 text-sm font-semibold">Total Energy</h4>
+              <h4 className="text-yellow-100 text-xs sm:text-sm font-semibold">Total Energy</h4>
             </div>
-            <p className="text-3xl font-bold text-white">
+            <p className="text-2xl sm:text-3xl font-bold text-white">
               {energyConsumption.kWh.toFixed(2)}
             </p>
             <p className="text-yellow-200 text-xs mt-1">kWh</p>
@@ -423,9 +423,9 @@ export default function MetricsChart({ deviceId }: MetricsChartProps) {
 
           {/* Average Power */}
           {powerStats && powerStats.avgWatts !== null && powerStats.avgWatts !== undefined && (
-            <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/40 rounded-lg p-4">
-              <h4 className="text-blue-200 text-sm font-semibold mb-2">Avg Power</h4>
-              <p className="text-3xl font-bold text-white">
+            <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/40 rounded-lg p-3 sm:p-4">
+              <h4 className="text-blue-200 text-xs sm:text-sm font-semibold mb-2">Avg Power</h4>
+              <p className="text-2xl sm:text-3xl font-bold text-white">
                 {powerStats.avgWatts.toFixed(1)}
               </p>
               <p className="text-blue-200 text-xs mt-1">Watts</p>
@@ -434,9 +434,9 @@ export default function MetricsChart({ deviceId }: MetricsChartProps) {
 
           {/* Max Power */}
           {powerStats && powerStats.maxWatts !== null && powerStats.maxWatts !== undefined && (
-            <div className="bg-gradient-to-br from-red-500/20 to-pink-500/20 border border-red-500/40 rounded-lg p-4">
-              <h4 className="text-red-200 text-sm font-semibold mb-2">Peak Power</h4>
-              <p className="text-3xl font-bold text-white">
+            <div className="bg-gradient-to-br from-red-500/20 to-pink-500/20 border border-red-500/40 rounded-lg p-3 sm:p-4">
+              <h4 className="text-red-200 text-xs sm:text-sm font-semibold mb-2">Peak Power</h4>
+              <p className="text-2xl sm:text-3xl font-bold text-white">
                 {powerStats.maxWatts.toFixed(1)}
               </p>
               <p className="text-red-200 text-xs mt-1">Watts</p>
@@ -445,9 +445,9 @@ export default function MetricsChart({ deviceId }: MetricsChartProps) {
 
           {/* Min Power */}
           {powerStats && powerStats.minWatts !== null && powerStats.minWatts !== undefined && (
-            <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 border border-green-500/40 rounded-lg p-4">
-              <h4 className="text-green-200 text-sm font-semibold mb-2">Min Power</h4>
-              <p className="text-3xl font-bold text-white">
+            <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 border border-green-500/40 rounded-lg p-3 sm:p-4">
+              <h4 className="text-green-200 text-xs sm:text-sm font-semibold mb-2">Min Power</h4>
+              <p className="text-2xl sm:text-3xl font-bold text-white">
                 {powerStats.minWatts.toFixed(1)}
               </p>
               <p className="text-green-200 text-xs mt-1">Watts</p>
@@ -485,35 +485,42 @@ export default function MetricsChart({ deviceId }: MetricsChartProps) {
 
       {/* Chart */}
       {chartData.length > 0 ? (
-        <ResponsiveContainer width="100%" height={400}>
+        <ResponsiveContainer width="100%" height={350} className="sm:!h-[400px]">
           <LineChart
             data={chartData}
-            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+            margin={{ top: 5, right: 5, left: -5, bottom: 20 }}
+            className="sm:!mr-[10px] sm:!ml-[5px] lg:!mr-[30px] lg:!ml-[20px]"
           >
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
 
             <XAxis
               dataKey="timeLabel"
               stroke="rgb(191, 219, 254)"
-              style={{ fontSize: '12px' }}
+              style={{ fontSize: '10px' }}
+              angle={-45}
+              textAnchor="end"
+              height={60}
+              interval="preserveStartEnd"
+              className="sm:!text-xs"
             />
 
             <YAxis
               stroke="rgb(191, 219, 254)"
-              style={{ fontSize: '12px' }}
+              style={{ fontSize: '10px' }}
               domain={[0, 100]}
-              label={{
-                value: 'Normalized (0-100)',
-                angle: -90,
-                position: 'insideLeft',
-                style: { fill: 'rgb(191, 219, 254)' }
-              }}
+              width={35}
+              className="sm:!text-xs sm:!w-[45px]"
             />
 
             <Tooltip content={<CustomTooltip />} />
 
             <Legend
-              wrapperStyle={{ cursor: 'pointer' }}
+              wrapperStyle={{
+                cursor: 'pointer',
+                fontSize: '10px',
+                paddingTop: '10px'
+              }}
+              iconSize={10}
               onClick={(e) => {
                 const dataKey = e.dataKey as keyof MetricVisibility;
                 if (dataKey) toggleMetric(dataKey);
@@ -597,11 +604,11 @@ export default function MetricsChart({ deviceId }: MetricsChartProps) {
 
       {/* Info note */}
       <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-        <p className="text-blue-200 text-xs">
-          💡 Chart shows normalized metrics (0-100 scale). Network values are scaled from 0-1000 Mbps, Power from 0-500W.
-          Hover over lines for actual values. Click legend items or checkboxes to toggle metrics.
+        <p className="text-blue-200 text-xs leading-relaxed">
+          💡 <strong>All metrics normalized to 0-100 scale.</strong> Network scaled from 0-1000 Mbps, Power from 0-500W.
+          Tap chart points for actual values. Toggle metrics using checkboxes above or legend below.
           {energyConsumption && energyConsumption.kWh > 0 && (
-            <span className="block mt-1">
+            <span className="block mt-2">
               ⚡ Energy consumption calculated using trapezoidal integration for accurate kWh measurement over the selected time period.
             </span>
           )}

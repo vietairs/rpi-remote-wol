@@ -47,22 +47,22 @@ export default function MetricCard({
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-lg rounded-xl p-4 border border-white/20 hover:border-white/30 transition-all">
-      <div className="flex items-center justify-between mb-3">
-        <div>
+    <div className="bg-white/10 backdrop-blur-lg rounded-xl p-3 sm:p-4 border border-white/20 hover:border-white/30 transition-all">
+      <div className="flex items-start sm:items-center justify-between mb-3 gap-2">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <IconComponent className={`w-6 h-6 ${iconColorClass}`} strokeWidth={2} />
-            <h3 className="text-white font-semibold text-lg">{title}</h3>
+            <IconComponent className={`w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0 ${iconColorClass}`} strokeWidth={2} />
+            <h3 className="text-white font-semibold text-base sm:text-lg truncate">{title}</h3>
           </div>
           {subtitle && (
-            <p className="text-blue-200 text-xs mt-1">{subtitle}</p>
+            <p className="text-blue-200 text-xs mt-1 truncate">{subtitle}</p>
           )}
         </div>
-        <div className={`text-right ${getColor()}`}>
-          <div className="text-3xl font-bold">
+        <div className={`text-right flex-shrink-0 ${getColor()}`}>
+          <div className="text-2xl sm:text-3xl font-bold whitespace-nowrap">
             {value !== null ? value.toFixed(1) : '--'}
           </div>
-          <div className="text-sm font-medium">{unit}</div>
+          <div className="text-xs sm:text-sm font-medium">{unit}</div>
         </div>
       </div>
 

@@ -116,14 +116,14 @@ export default function MetricsPanel({ deviceId, deviceName, onClose }: MetricsP
 
   if (loading) {
     return (
-      <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
-        <div className="flex items-center justify-center py-12">
+      <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 sm:p-6 border border-white/20">
+        <div className="flex items-center justify-center py-8 sm:py-12">
           <div className="text-center">
-            <svg className="animate-spin h-12 w-12 text-blue-400 mx-auto mb-4" viewBox="0 0 24 24">
+            <svg className="animate-spin h-10 w-10 sm:h-12 sm:w-12 text-blue-400 mx-auto mb-4" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
-            <p className="text-white font-medium">Loading metrics...</p>
+            <p className="text-white font-medium text-sm sm:text-base">Loading metrics...</p>
           </div>
         </div>
       </div>
@@ -131,38 +131,42 @@ export default function MetricsPanel({ deviceId, deviceName, onClose }: MetricsP
   }
 
   return (
-    <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+    <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 sm:p-6 border border-white/20">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <div className="flex items-center gap-2">
-            <LineChart className="w-7 h-7 text-blue-300" strokeWidth={2} />
-            <h2 className="text-2xl font-bold text-white">System Metrics</h2>
+            <LineChart className="w-6 h-6 sm:w-7 sm:h-7 text-blue-300" strokeWidth={2} />
+            <h2 className="text-xl sm:text-2xl font-bold text-white">System Metrics</h2>
           </div>
           <p className="text-blue-200 text-sm mt-1">{deviceName}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
           {lastUpdate && (
-            <span className="text-xs text-blue-200">
+            <span className="text-xs text-blue-200 order-2 sm:order-1">
               Last updated: {lastUpdate.toLocaleTimeString()}
             </span>
           )}
-          <button
-            onClick={collectMetrics}
-            disabled={collecting}
-            className="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 disabled:bg-gray-500/20 border border-blue-500/50 text-blue-100 text-sm font-medium rounded-lg transition-colors disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            <RefreshCw className={`w-4 h-4 ${collecting ? 'animate-spin' : ''}`} />
-            {collecting ? 'Collecting...' : 'Refresh'}
-          </button>
-          {onClose && (
+          <div className="flex items-center gap-2 order-1 sm:order-2">
             <button
-              onClick={onClose}
-              className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 text-red-100 text-sm font-medium rounded-lg transition-colors"
+              onClick={collectMetrics}
+              disabled={collecting}
+              className="px-3 sm:px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 disabled:bg-gray-500/20 border border-blue-500/50 text-blue-100 text-sm font-medium rounded-lg transition-colors disabled:cursor-not-allowed flex items-center gap-2"
             >
-              <X className="w-5 h-5" />
+              <RefreshCw className={`w-4 h-4 ${collecting ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{collecting ? 'Collecting...' : 'Refresh'}</span>
+              <span className="sm:hidden">{collecting ? '...' : ''}</span>
             </button>
-          )}
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 text-red-100 text-sm font-medium rounded-lg transition-colors"
+                aria-label="Close metrics"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
