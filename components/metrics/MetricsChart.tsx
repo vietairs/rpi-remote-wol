@@ -488,8 +488,8 @@ export default function MetricsChart({ deviceId }: MetricsChartProps) {
         <ResponsiveContainer width="100%" height={350} className="sm:!h-[400px]">
           <LineChart
             data={chartData}
-            margin={{ top: 5, right: 5, left: -5, bottom: 20 }}
-            className="sm:!mr-[10px] sm:!ml-[5px] lg:!mr-[30px] lg:!ml-[20px]"
+            margin={{ top: 5, right: 5, left: -10, bottom: 20 }}
+            className="sm:!mr-[10px] sm:!ml-[0px] lg:!mr-[30px] lg:!ml-[15px]"
           >
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
 
@@ -508,8 +508,8 @@ export default function MetricsChart({ deviceId }: MetricsChartProps) {
               stroke="rgb(191, 219, 254)"
               style={{ fontSize: '10px' }}
               domain={[0, 100]}
-              width={35}
-              className="sm:!text-xs sm:!w-[45px]"
+              width={25}
+              className="sm:!text-xs sm:!w-[35px]"
             />
 
             <Tooltip content={<CustomTooltip />} />
