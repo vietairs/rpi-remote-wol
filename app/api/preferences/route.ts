@@ -6,7 +6,7 @@ import { userPreferencesDb } from '@/lib/db';
  * GET /api/preferences
  * Get current user's preferences
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

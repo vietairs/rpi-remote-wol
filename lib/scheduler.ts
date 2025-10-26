@@ -1,4 +1,4 @@
-import { deviceDb, metricsDb, userPreferencesDb, userDb } from './db';
+import { deviceDb, metricsDb, userPreferencesDb, userDb, type Device } from './db';
 import { collectMetrics } from './metrics';
 import { collectionHistoryDb } from './db-collection-history';
 import { notificationService } from './notification-service';
@@ -160,9 +160,10 @@ class MetricsScheduler {
       );
 
       // Filter to only online devices
+      interface DeviceStatus { device: Device; online: boolean }
       const onlineDevices = statusChecks
-        .filter((result) => result.status === 'fulfilled' && result.value.online)
-        .map((result) => (result as PromiseFulfilledResult<{ device: any; online: boolean }>).value.device);
+        .filter((result): result is PromiseFulfilledResult<DeviceStatus> => result.status === 'fulfilled' && result.value.online)
+        .map((result) => result.value.device);
 
       console.log(`[Scheduler] ${onlineDevices.length}/${devices.length} devices online`);
 

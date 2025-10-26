@@ -6,7 +6,7 @@ import { getScheduler } from '@/lib/scheduler';
  * GET /api/scheduler
  * Get current scheduler state and configuration
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

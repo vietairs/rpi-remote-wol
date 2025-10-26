@@ -10,12 +10,6 @@ interface ApiKey {
   last_used_at: string | null;
 }
 
-interface UserPreferences {
-  metrics_poll_interval_ms: number;
-  enable_notifications: number;
-  power_threshold_watts: number | null;
-}
-
 export default function Settings() {
   const router = useRouter();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
@@ -27,11 +21,6 @@ export default function Settings() {
   const [showCreateForm, setShowCreateForm] = useState<boolean>(false);
 
   // Notification preferences
-  const [preferences, setPreferences] = useState<UserPreferences>({
-    metrics_poll_interval_ms: 300000,
-    enable_notifications: 0,
-    power_threshold_watts: null,
-  });
   const [pollIntervalMinutes, setPollIntervalMinutes] = useState<number>(5);
   const [enableNotifications, setEnableNotifications] = useState<boolean>(false);
   const [powerThreshold, setPowerThreshold] = useState<string>('');
@@ -72,7 +61,6 @@ export default function Settings() {
       const response = await fetch('/api/preferences');
       const data = await response.json();
       if (response.ok) {
-        setPreferences(data.preferences);
         setPollIntervalMinutes(Math.floor(data.preferences.metrics_poll_interval_ms / 60000));
         setEnableNotifications(data.preferences.enable_notifications === 1);
         setPowerThreshold(data.preferences.power_threshold_watts?.toString() || '');
@@ -115,7 +103,6 @@ export default function Settings() {
       const data = await response.json();
 
       if (response.ok) {
-        setPreferences(data.preferences);
         setStatus('Preferences saved successfully!');
       } else {
         setStatus(`Error: ${data.error}`);
@@ -326,7 +313,7 @@ export default function Settings() {
                   <span className="text-blue-200">watts</span>
                 </div>
                 <p className="text-blue-300 text-sm mt-2">
-                  You'll receive an alert when power consumption exceeds this value (max once per hour per device)
+                  You&apos;ll receive an alert when power consumption exceeds this value (max once per hour per device)
                 </p>
               </div>
             )}

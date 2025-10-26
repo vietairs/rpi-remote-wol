@@ -99,7 +99,7 @@ export const notificationService = {
     const database = getNotificationDb();
 
     let query = 'SELECT * FROM notifications WHERE user_id = ?';
-    const params: any[] = [userId];
+    const params: (number)[] = [userId];
 
     if (unreadOnly) {
       query += ' AND read = 0';
@@ -252,7 +252,7 @@ export const notificationService = {
       LIMIT 1
     `);
 
-    const existing = existingStmt.get(userId, deviceId, sixHoursAgo.toISOString());
+    const existing = existingStmt.get(userId, deviceId, sixHoursAgo.toISOString()) as { id: number } | undefined;
 
     if (existing) {
       // Return existing notification to avoid spam

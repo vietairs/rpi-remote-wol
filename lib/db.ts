@@ -775,7 +775,7 @@ export const userPreferencesDb = {
     }
 
     const fields: string[] = [];
-    const values: any[] = [];
+    const values: (number | null)[] = [];
 
     if (updates.metrics_poll_interval_ms !== undefined) {
       fields.push('metrics_poll_interval_ms = ?');
