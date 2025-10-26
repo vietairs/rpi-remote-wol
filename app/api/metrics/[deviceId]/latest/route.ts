@@ -79,20 +79,20 @@ export async function GET(
           total: latestMetrics.ram_total_gb,
           percent: latestMetrics.ram_percent,
         },
-        gpu: latestMetrics.gpu_percent
+        gpu: latestMetrics.gpu_percent !== null && latestMetrics.gpu_percent !== undefined
           ? {
               usage: latestMetrics.gpu_percent,
               memoryUsed: latestMetrics.gpu_memory_used_mb,
               memoryTotal: latestMetrics.gpu_memory_total_mb,
             }
           : null,
-        network: latestMetrics.network_rx_mbps
+        network: latestMetrics.network_rx_mbps !== null && latestMetrics.network_rx_mbps !== undefined
           ? {
               rxMbps: latestMetrics.network_rx_mbps,
               txMbps: latestMetrics.network_tx_mbps,
             }
           : null,
-        power: latestMetrics.power_consumption_w
+        power: latestMetrics.power_consumption_w !== null && latestMetrics.power_consumption_w !== undefined
           ? {
               watts: latestMetrics.power_consumption_w,
               estimated: latestMetrics.power_estimated === 1,
