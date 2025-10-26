@@ -68,6 +68,7 @@ export default function MetricsPanel({ deviceId, deviceName, deviceIpAddress, on
       setError(err instanceof Error ? err.message : 'Failed to collect metrics');
     } finally {
       setCollecting(false);
+      setLoading(false); // Ensure loading state is cleared
     }
   };
 
@@ -138,6 +139,9 @@ export default function MetricsPanel({ deviceId, deviceName, deviceIpAddress, on
       // Fallback to DB on error
       setIsOnline(false);
       await loadLatestMetrics();
+    } finally {
+      // Always ensure loading state is cleared
+      setLoading(false);
     }
   };
 
