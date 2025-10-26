@@ -131,11 +131,14 @@ export async function collectMetrics(device: Device): Promise<MetricsCollectionR
       executePowerShellCommand(ssh, POWERSHELL_COMMANDS.power, 5000),
     ]);
 
+    // Create device key for network tracking (deviceId would be better but we use IP as unique identifier)
+    const deviceKey = `${device.id}:${device.ip_address}`;
+
     // Parse results
     const cpu = cpuResult.status === 'fulfilled' ? parseCpuOutput(cpuResult.value) : null;
     const ram = ramResult.status === 'fulfilled' ? parseRamOutput(ramResult.value) : { used: null, total: null, percent: null };
     const gpu = gpuResult.status === 'fulfilled' ? parseGpuOutput(gpuResult.value) : null;
-    const network = networkResult.status === 'fulfilled' ? parseNetworkOutput(networkResult.value) : null;
+    const network = networkResult.status === 'fulfilled' ? parseNetworkOutput(networkResult.value, deviceKey, timestamp * 1000) : null;
     const cpuPower = cpuPowerResult.status === 'fulfilled' ? parseCpuPowerOutput(cpuPowerResult.value) : null;
     const totalPower = powerResult.status === 'fulfilled' ? parsePowerOutput(powerResult.value) : null;
 
@@ -287,19 +290,80 @@ function parseGpuOutput(output: string): {
   return null;
 }
 
+// Store previous network samples for rate calculation
+// Key format: "deviceId:ipAddress"
+const previousNetworkSamples = new Map<string, {
+  rxBytes: number;
+  txBytes: number;
+  timestamp: number;
+}>();
+
 /**
  * Parse network output: "receivedBytes,sentBytes"
- * Note: This returns cumulative bytes. For rate calculation, need previous sample.
- * Returning null for now as we need delta calculation logic.
+ * Calculates Mbps by comparing with previous sample (delta calculation)
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function parseNetworkOutput(_output: string): {
+function parseNetworkOutput(
+  output: string,
+  deviceKey: string,
+  currentTimestamp: number
+): {
   rxMbps: number | null;
   txMbps: number | null;
 } | null {
-  // Network rate calculation requires storing previous sample and computing delta
-  // For MVP, return null and implement in future iteration
-  return null;
+  if (!output || output === 'N/A') {
+    return null;
+  }
+
+  const parts = output.split(',').map(s => parseFloat(s.trim()));
+
+  if (parts.length !== 2 || parts.some(isNaN)) {
+    return null;
+  }
+
+  const rxBytes = parts[0];
+  const txBytes = parts[1];
+
+  // Get previous sample if exists
+  const previousSample = previousNetworkSamples.get(deviceKey);
+
+  // Store current sample for next calculation
+  previousNetworkSamples.set(deviceKey, {
+    rxBytes,
+    txBytes,
+    timestamp: currentTimestamp,
+  });
+
+  // If no previous sample, return null (need at least 2 samples)
+  if (!previousSample) {
+    return null;
+  }
+
+  // Calculate time delta in seconds
+  const timeDeltaSeconds = (currentTimestamp - previousSample.timestamp) / 1000;
+
+  // Avoid division by zero or very small time deltas
+  if (timeDeltaSeconds < 0.1) {
+    return null;
+  }
+
+  // Calculate byte deltas
+  const rxBytesDelta = rxBytes - previousSample.rxBytes;
+  const txBytesDelta = txBytes - previousSample.txBytes;
+
+  // Handle counter rollover (unlikely but possible)
+  if (rxBytesDelta < 0 || txBytesDelta < 0) {
+    // Counter rolled over or adapter was reset, skip this sample
+    return null;
+  }
+
+  // Calculate Mbps (bytes/sec * 8 / 1,000,000)
+  const rxMbps = (rxBytesDelta / timeDeltaSeconds) * 8 / 1_000_000;
+  const txMbps = (txBytesDelta / timeDeltaSeconds) * 8 / 1_000_000;
+
+  return {
+    rxMbps: Math.round(rxMbps * 100) / 100,
+    txMbps: Math.round(txMbps * 100) / 100,
+  };
 }
 
 /**
