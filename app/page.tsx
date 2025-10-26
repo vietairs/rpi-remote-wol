@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Activity } from 'lucide-react';
 import MetricsPanel from '@/components/metrics/MetricsPanel';
+import NotificationBell from '@/components/NotificationBell';
 
 interface Device {
   id: number;
@@ -640,6 +641,7 @@ export default function Home() {
                 {currentUser}
               </span>
             )}
+            <NotificationBell />
             <button
               onClick={() => router.push('/settings')}
               className="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-200 hover:text-blue-100 border border-blue-500/50 rounded-lg transition-colors text-sm font-medium"
@@ -1028,6 +1030,7 @@ export default function Home() {
             <MetricsPanel
               deviceId={metricsDeviceId}
               deviceName={savedDevices.find(d => d.id === metricsDeviceId)?.name || 'Device'}
+              deviceIpAddress={savedDevices.find(d => d.id === metricsDeviceId)?.ip_address || null}
               onClose={() => setMetricsDeviceId(null)}
             />
           </div>

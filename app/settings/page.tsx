@@ -10,6 +10,12 @@ interface ApiKey {
   last_used_at: string | null;
 }
 
+interface UserPreferences {
+  metrics_poll_interval_ms: number;
+  enable_notifications: number;
+  power_threshold_watts: number | null;
+}
+
 export default function Settings() {
   const router = useRouter();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
@@ -20,9 +26,21 @@ export default function Settings() {
   const [currentUser, setCurrentUser] = useState<string>('');
   const [showCreateForm, setShowCreateForm] = useState<boolean>(false);
 
+  // Notification preferences
+  const [preferences, setPreferences] = useState<UserPreferences>({
+    metrics_poll_interval_ms: 300000,
+    enable_notifications: 0,
+    power_threshold_watts: null,
+  });
+  const [pollIntervalMinutes, setPollIntervalMinutes] = useState<number>(5);
+  const [enableNotifications, setEnableNotifications] = useState<boolean>(false);
+  const [powerThreshold, setPowerThreshold] = useState<string>('');
+  const [prefsLoading, setPrefsLoading] = useState<boolean>(false);
+
   useEffect(() => {
     checkSession();
     loadApiKeys();
+    loadPreferences();
   }, []);
 
   const checkSession = async () => {
@@ -46,6 +64,67 @@ export default function Settings() {
       }
     } catch (error) {
       console.error('Failed to load API keys:', error);
+    }
+  };
+
+  const loadPreferences = async () => {
+    try {
+      const response = await fetch('/api/preferences');
+      const data = await response.json();
+      if (response.ok) {
+        setPreferences(data.preferences);
+        setPollIntervalMinutes(Math.floor(data.preferences.metrics_poll_interval_ms / 60000));
+        setEnableNotifications(data.preferences.enable_notifications === 1);
+        setPowerThreshold(data.preferences.power_threshold_watts?.toString() || '');
+      }
+    } catch (error) {
+      console.error('Failed to load preferences:', error);
+    }
+  };
+
+  const handleSavePreferences = async () => {
+    setPrefsLoading(true);
+    setStatus('');
+
+    try {
+      const updates: {
+        metrics_poll_interval_ms: number;
+        enable_notifications: number;
+        power_threshold_watts?: number | null;
+      } = {
+        metrics_poll_interval_ms: pollIntervalMinutes * 60000,
+        enable_notifications: enableNotifications ? 1 : 0,
+      };
+
+      // Only include power threshold if notifications are enabled
+      if (enableNotifications) {
+        const thresholdValue = parseFloat(powerThreshold);
+        updates.power_threshold_watts = isNaN(thresholdValue) ? null : thresholdValue;
+      } else {
+        updates.power_threshold_watts = null;
+      }
+
+      const response = await fetch('/api/preferences', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setPreferences(data.preferences);
+        setStatus('Preferences saved successfully!');
+      } else {
+        setStatus(`Error: ${data.error}`);
+      }
+    } catch (error) {
+      setStatus('Failed to save preferences');
+      console.error(error);
+    } finally {
+      setPrefsLoading(false);
     }
   };
 
@@ -164,7 +243,7 @@ export default function Settings() {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-white mb-2">Settings</h1>
-            <p className="text-blue-200">Manage your API keys</p>
+            <p className="text-blue-200">Manage API keys and notifications</p>
           </div>
           <div className="flex items-center gap-4">
             {currentUser && (
@@ -183,6 +262,85 @@ export default function Settings() {
             >
               Logout
             </button>
+          </div>
+        </div>
+
+        {/* Notification Preferences Section */}
+        <div className="mb-8">
+          <h2 className="text-white font-semibold text-xl mb-4">Notification Preferences</h2>
+
+          <div className="space-y-6 p-6 bg-white/5 border border-white/20 rounded-lg">
+            {/* Metrics Polling Interval */}
+            <div>
+              <label className="block text-white font-medium mb-2">
+                Metrics Collection Interval
+              </label>
+              <div className="flex items-center gap-4">
+                <input
+                  type="number"
+                  min="1"
+                  max="60"
+                  value={pollIntervalMinutes}
+                  onChange={(e) => setPollIntervalMinutes(parseInt(e.target.value) || 5)}
+                  className="w-24 px-4 py-2 bg-white/10 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+                <span className="text-blue-200">minutes</span>
+              </div>
+              <p className="text-blue-300 text-sm mt-2">
+                How often the UI automatically refreshes metrics when device is online (1-60 minutes)
+              </p>
+            </div>
+
+            {/* Enable Notifications */}
+            <div>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={enableNotifications}
+                  onChange={(e) => setEnableNotifications(e.target.checked)}
+                  className="w-5 h-5 rounded border-white/30 text-blue-500 focus:ring-2 focus:ring-blue-400"
+                />
+                <span className="text-white font-medium">Enable Power Consumption Alerts</span>
+              </label>
+              <p className="text-blue-300 text-sm mt-2 ml-8">
+                Get notified when power consumption exceeds your threshold
+              </p>
+            </div>
+
+            {/* Power Threshold */}
+            {enableNotifications && (
+              <div>
+                <label className="block text-white font-medium mb-2">
+                  Power Threshold (Watts)
+                </label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="number"
+                    min="0"
+                    step="10"
+                    value={powerThreshold}
+                    onChange={(e) => setPowerThreshold(e.target.value)}
+                    placeholder="e.g., 300"
+                    className="w-32 px-4 py-2 bg-white/10 border border-white/30 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                  <span className="text-blue-200">watts</span>
+                </div>
+                <p className="text-blue-300 text-sm mt-2">
+                  You'll receive an alert when power consumption exceeds this value (max once per hour per device)
+                </p>
+              </div>
+            )}
+
+            {/* Save Button */}
+            <div className="pt-4 border-t border-white/20">
+              <button
+                onClick={handleSavePreferences}
+                disabled={prefsLoading}
+                className="px-6 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-500 text-white font-medium rounded-lg transition-colors disabled:cursor-not-allowed"
+              >
+                {prefsLoading ? 'Saving...' : '💾 Save Preferences'}
+              </button>
+            </div>
           </div>
         </div>
 

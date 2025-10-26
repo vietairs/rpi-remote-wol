@@ -30,15 +30,18 @@ interface MetricsData {
 interface MetricsPanelProps {
   deviceId: number;
   deviceName: string;
+  deviceIpAddress?: string | null;
   onClose?: () => void;
 }
 
-export default function MetricsPanel({ deviceId, deviceName, onClose }: MetricsPanelProps) {
+export default function MetricsPanel({ deviceId, deviceName, deviceIpAddress, onClose }: MetricsPanelProps) {
   const [metrics, setMetrics] = useState<MetricsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [collecting, setCollecting] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [isOnline, setIsOnline] = useState(false);
+  const [pollIntervalMs, setPollIntervalMs] = useState(300000); // Default: 5 minutes
   const pollingInterval = useRef<NodeJS.Timeout | null>(null);
 
   // Collect metrics from the device
@@ -98,21 +101,79 @@ export default function MetricsPanel({ deviceId, deviceName, onClose }: MetricsP
     }
   };
 
-  // Initial load
-  useEffect(() => {
-    loadLatestMetrics();
+  // Smart polling: Check device status and collect metrics if online
+  const smartPoll = async () => {
+    // Skip if no IP address configured
+    if (!deviceIpAddress) {
+      await loadLatestMetrics();
+      return;
+    }
 
-    // Set up polling every 30 seconds
+    try {
+      // Check device online status
+      const statusResponse = await fetch('/api/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ipAddress: deviceIpAddress }),
+      });
+
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json();
+        setIsOnline(statusData.online);
+
+        if (statusData.online) {
+          // Device is online → Collect fresh metrics from PC
+          await collectMetrics();
+        } else {
+          // Device is offline → Load latest from database
+          await loadLatestMetrics();
+        }
+      } else {
+        // Status check failed → Fallback to DB
+        setIsOnline(false);
+        await loadLatestMetrics();
+      }
+    } catch (error) {
+      console.error('Smart polling error:', error);
+      // Fallback to DB on error
+      setIsOnline(false);
+      await loadLatestMetrics();
+    }
+  };
+
+  // Load user preferences for polling interval
+  useEffect(() => {
+    const loadPreferences = async () => {
+      try {
+        const response = await fetch('/api/preferences');
+        if (response.ok) {
+          const data = await response.json();
+          setPollIntervalMs(data.preferences.metrics_poll_interval_ms || 300000);
+        }
+      } catch (error) {
+        console.error('Failed to load preferences:', error);
+      }
+    };
+
+    loadPreferences();
+  }, []);
+
+  // Initial load and polling setup
+  useEffect(() => {
+    smartPoll(); // Initial load
+
+    // Poll based on user preference
     pollingInterval.current = setInterval(() => {
-      loadLatestMetrics();
-    }, 30000);
+      smartPoll();
+    }, pollIntervalMs);
 
     return () => {
       if (pollingInterval.current) {
         clearInterval(pollingInterval.current);
       }
     };
-  }, [deviceId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deviceId, deviceIpAddress, pollIntervalMs]);
 
   if (loading) {
     return (
@@ -138,6 +199,17 @@ export default function MetricsPanel({ deviceId, deviceName, onClose }: MetricsP
           <div className="flex items-center gap-2">
             <LineChart className="w-6 h-6 sm:w-7 sm:h-7 text-blue-300" strokeWidth={2} />
             <h2 className="text-xl sm:text-2xl font-bold text-white">System Metrics</h2>
+            {/* Online indicator */}
+            {deviceIpAddress && (
+              <span className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${
+                isOnline
+                  ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                  : 'bg-red-500/20 text-red-300 border border-red-500/30'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-400' : 'bg-red-400'}`} />
+                {isOnline ? 'Online' : 'Offline'}
+              </span>
+            )}
           </div>
           <p className="text-blue-200 text-sm mt-1">{deviceName}</p>
         </div>
@@ -263,7 +335,10 @@ export default function MetricsPanel({ deviceId, deviceName, onClose }: MetricsP
       {/* Info note */}
       <div className="mt-6 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
         <p className="text-blue-200 text-xs">
-          💡 Metrics are automatically refreshed every 30 seconds. Click &quot;Refresh&quot; to collect new data immediately.
+          💡 {deviceIpAddress
+            ? `Metrics are auto-collected every ${Math.round(pollIntervalMs / 60000)} minutes when PC is online. Click "Refresh" to collect immediately.`
+            : 'Configure device IP address to enable auto-collection. Click "Refresh" to collect metrics.'
+          }
           {metrics?.power?.estimated && (
             <span className="block mt-1">
               ⚡ Power consumption is estimated based on CPU/GPU usage (hardware monitoring unavailable).

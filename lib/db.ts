@@ -82,6 +82,22 @@ export interface SystemMetricsInput {
   timestamp: number;
 }
 
+export interface UserPreferences {
+  user_id: number;
+  metrics_poll_interval_ms: number; // Client-side polling interval
+  enable_notifications: number; // 0 or 1 (boolean)
+  power_threshold_watts: number | null; // Alert threshold for power consumption
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserPreferencesInput {
+  user_id: number;
+  metrics_poll_interval_ms?: number;
+  enable_notifications?: boolean;
+  power_threshold_watts?: number | null;
+}
+
 let db: Database.Database | null = null;
 
 // Lazy initialization function
@@ -165,6 +181,16 @@ function getDb(): Database.Database {
 
       CREATE INDEX IF NOT EXISTS idx_metrics_device_created
       ON system_metrics(device_id, created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS user_preferences (
+        user_id INTEGER PRIMARY KEY,
+        metrics_poll_interval_ms INTEGER DEFAULT 300000,
+        enable_notifications INTEGER DEFAULT 0,
+        power_threshold_watts REAL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
     `);
 
     // Migration: Add columns if they don't exist
@@ -712,6 +738,81 @@ export function getAdaptiveAggregates(
     };
   }
 }
+
+// User Preferences Database Operations
+export const userPreferencesDb = {
+  get: (userId: number): UserPreferences | undefined => {
+    const database = getDb();
+    const stmt = database.prepare('SELECT * FROM user_preferences WHERE user_id = ?');
+    return stmt.get(userId) as UserPreferences | undefined;
+  },
+
+  create: (input: UserPreferencesInput): UserPreferences => {
+    const database = getDb();
+    const stmt = database.prepare(`
+      INSERT INTO user_preferences (user_id, metrics_poll_interval_ms, enable_notifications, power_threshold_watts)
+      VALUES (?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      input.user_id,
+      input.metrics_poll_interval_ms ?? 300000, // Default: 5 minutes
+      input.enable_notifications ? 1 : 0,
+      input.power_threshold_watts ?? null
+    );
+
+    const getStmt = database.prepare('SELECT * FROM user_preferences WHERE user_id = ?');
+    return getStmt.get(input.user_id) as UserPreferences;
+  },
+
+  update: (userId: number, updates: Partial<UserPreferencesInput>): UserPreferences | undefined => {
+    const database = getDb();
+    const existing = userPreferencesDb.get(userId);
+
+    if (!existing) {
+      // Create if doesn't exist
+      return userPreferencesDb.create({ user_id: userId, ...updates });
+    }
+
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (updates.metrics_poll_interval_ms !== undefined) {
+      fields.push('metrics_poll_interval_ms = ?');
+      values.push(updates.metrics_poll_interval_ms);
+    }
+
+    if (updates.enable_notifications !== undefined) {
+      fields.push('enable_notifications = ?');
+      values.push(updates.enable_notifications ? 1 : 0);
+    }
+
+    if (updates.power_threshold_watts !== undefined) {
+      fields.push('power_threshold_watts = ?');
+      values.push(updates.power_threshold_watts);
+    }
+
+    if (fields.length === 0) {
+      return existing;
+    }
+
+    fields.push('updated_at = CURRENT_TIMESTAMP');
+
+    const stmt = database.prepare(
+      `UPDATE user_preferences SET ${fields.join(', ')} WHERE user_id = ?`
+    );
+    stmt.run(...values, userId);
+
+    return userPreferencesDb.get(userId);
+  },
+
+  getOrCreate: (userId: number): UserPreferences => {
+    const existing = userPreferencesDb.get(userId);
+    if (existing) return existing;
+
+    return userPreferencesDb.create({ user_id: userId });
+  },
+};
 
 // Export close function for cleanup
 export function closeDb(): void {

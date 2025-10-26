@@ -11,15 +11,20 @@ export async function register() {
 
     // Dynamically import to avoid Edge Runtime issues
     const maintenanceService = (await import('./lib/maintenance-service')).default;
+    const { startScheduler, stopScheduler } = await import('./lib/scheduler');
 
     // Start background maintenance service
     // Checkpoint every 6 hours, optimize every 24 hours
     maintenanceService.start(6, 24);
 
+    // Start metrics collection scheduler
+    startScheduler();
+
     // Graceful shutdown handler
     const shutdown = () => {
       console.log('[Instrumentation] Shutting down gracefully...');
       maintenanceService.stop();
+      stopScheduler();
       process.exit(0);
     };
 

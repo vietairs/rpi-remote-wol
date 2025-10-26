@@ -263,9 +263,16 @@ export default function MetricsChart({ deviceId }: MetricsChartProps) {
     }));
   };
 
-  // Fetch data on mount and when duration changes
+  // Fetch data on mount, when duration changes, and auto-refresh every 5 minutes
   useEffect(() => {
     fetchHistoricalData();
+
+    // Auto-refresh chart every 5 minutes to match collection interval
+    const chartRefreshInterval = setInterval(() => {
+      fetchHistoricalData();
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(chartRefreshInterval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceId, duration]);
 

@@ -40,6 +40,11 @@ openssl rand -base64 32
 # Create .env file with:
 JWT_SECRET=<generated-secret>
 METRICS_RETENTION_DAYS=365  # Optional: Default is 365 days (1 year)
+
+# Background scheduler (optional)
+ENABLE_BACKGROUND_METRICS=true  # Enable 24/7 background metrics collection
+BACKGROUND_METRICS_INTERVAL=300000  # Collection interval in ms (5 minutes)
+BACKGROUND_METRICS_CONCURRENT=3  # Max concurrent device collections
 ```
 
 ### Database Location
@@ -48,6 +53,9 @@ SQLite database is auto-created at `data/devices.db` on first run. Contains:
 - `devices` table (name, mac_address, ip_address, ssh_username, ssh_password)
 - `api_keys` table (key_hash, name, created_by, last_used_at)
 - `system_metrics` table (device metrics: CPU, RAM, GPU, network, power consumption)
+- `user_preferences` table (metrics polling interval, notification settings, power threshold)
+- `collection_history` table (success/failure tracking, performance metrics)
+- `notifications` table (power alerts, collection failures, device offline alerts)
 
 ## Architecture
 
@@ -67,6 +75,9 @@ app/
 │   ├── devices/     # Device CRUD operations
 │   ├── keys/        # API key management (create, list, delete)
 │   ├── metrics/     # System metrics (collect, retrieve, cleanup, energy stats)
+│   ├── notifications/ # Notification management (list, mark read, delete)
+│   ├── preferences/ # User preferences (polling interval, notification settings)
+│   ├── scheduler/   # Background scheduler control (start, stop, status)
 │   ├── wake/        # Wake-on-LAN endpoint
 │   ├── shutdown/    # SSH shutdown endpoint
 │   ├── sleep/       # SSH sleep endpoint
@@ -74,13 +85,22 @@ app/
 │   └── discover-ip/ # ARP-based IP discovery
 ├── login/           # Login page
 ├── setup/           # First-time admin account creation
-├── settings/        # API key management UI
-└── page.tsx         # Main dashboard with metrics charts
+├── settings/        # API key management & notification preferences UI
+└── page.tsx         # Main dashboard with metrics charts & notification bell
 
 lib/
-├── db.ts            # Database layer (deviceDb, userDb, apiKeyDb, metricsDb)
-├── auth.ts          # Auth utilities (JWT, bcrypt, API keys, session management)
-└── metrics.ts       # System metrics collection via SSH + PowerShell
+├── db.ts                    # Database layer (deviceDb, userDb, apiKeyDb, metricsDb, userPreferencesDb)
+├── auth.ts                  # Auth utilities (JWT, bcrypt, API keys, session management)
+├── metrics.ts               # System metrics collection via SSH + PowerShell
+├── scheduler.ts             # Background scheduler for 24/7 metrics collection
+├── notification-service.ts  # Notification system (power alerts, collection failures)
+└── db-collection-history.ts # Collection history tracking and statistics
+
+components/
+├── NotificationBell.tsx     # Notification bell UI with dropdown panel
+└── metrics/
+    ├── MetricsPanel.tsx     # Metrics dashboard with smart polling
+    └── MetricsChart.tsx     # Historical metrics visualization
 
 tests/
 ├── e2e/             # Playwright E2E tests
@@ -426,6 +446,138 @@ Add to your Homebridge `config.json`:
 - "Hey Siri, turn on Shutdown"
 - "Hey Siri, what's the CPU temperature?"
 - "Hey Siri, what's the humidity in Gaming PC?" (RAM usage)
+
+## Background Scheduler & Notifications
+
+The application includes a 24/7 background scheduler for automatic metrics collection and a notification system for power consumption alerts.
+
+### Background Metrics Collection
+
+**Features**:
+- Automatic metrics collection at configurable intervals (1-60 minutes)
+- Runs independently of UI interactions
+- Only collects from online devices (status check first)
+- Batch processing with concurrency control (configurable max concurrent devices)
+- Automatic retry and error handling
+- Collection history tracking with performance metrics
+
+**Configuration** (via `.env`):
+```bash
+ENABLE_BACKGROUND_METRICS=true  # Enable/disable scheduler
+BACKGROUND_METRICS_INTERVAL=300000  # Collection interval in ms (5 minutes default)
+BACKGROUND_METRICS_CONCURRENT=3  # Max devices to collect from simultaneously
+```
+
+**API Control**:
+- `GET /api/scheduler` - Get scheduler state and configuration
+- `POST /api/scheduler` - Control actions (start, stop, run-now)
+- `PATCH /api/scheduler` - Update configuration
+
+**How It Works**:
+1. Scheduler starts automatically on server boot (via `instrumentation.ts`)
+2. Every N minutes: checks device status → collects from online devices → stores metrics
+3. Logs all collection attempts to `collection_history` table
+4. Graceful shutdown on server stop (SIGTERM/SIGINT)
+
+### Notification System
+
+**Features**:
+- Power consumption threshold alerts
+- Collection failure notifications
+- Device offline alerts
+- Anti-spam logic (1-hour cooldown for power alerts, 6-hour for offline alerts)
+- Unread count tracking
+- Mark as read/delete functionality
+- Bell icon UI with dropdown panel
+
+**Configuration** (via Settings page):
+1. Navigate to Settings (⚙️ button in header)
+2. Enable "Enable Power Consumption Alerts" checkbox
+3. Set power threshold in watts (e.g., 300W)
+4. Save preferences
+
+**Notification Types**:
+- **Power Threshold** (`warning`): Triggered when power consumption exceeds threshold
+  - Cooldown: 1 hour per device (prevents spam)
+  - Example: "High Power Usage: Gaming PC - Power consumption (350.5W) exceeded threshold (300.0W)"
+
+- **Collection Failure** (`error`): Triggered when metrics collection fails
+  - Example: "Metrics Collection Failed: Gaming PC - Failed to collect metrics: SSH timeout"
+
+- **Device Offline** (`info`): Triggered when device goes offline
+  - Cooldown: 6 hours per device
+  - Example: "Device Offline: Gaming PC - Gaming PC is no longer responding"
+
+**API Endpoints**:
+- `GET /api/notifications?unreadOnly=true&limit=50` - Get notifications
+- `PATCH /api/notifications/[id]` - Mark notification as read
+- `DELETE /api/notifications/[id]` - Delete notification
+- `POST /api/notifications` - Bulk actions (mark-all-read, cleanup)
+
+**Database Schema**:
+```sql
+CREATE TABLE notifications (
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  device_id INTEGER,
+  type TEXT NOT NULL,  -- 'power_threshold' | 'collection_failure' | 'device_offline'
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  severity TEXT NOT NULL,  -- 'info' | 'warning' | 'error'
+  read INTEGER NOT NULL DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### User Preferences
+
+**Configurable Settings** (via Settings page):
+- **Metrics Collection Interval**: 1-60 minutes (how often UI auto-refreshes when device is online)
+- **Enable Notifications**: On/off toggle for power consumption alerts
+- **Power Threshold**: Watts value that triggers alerts when exceeded
+
+**API Endpoints**:
+- `GET /api/preferences` - Get current user preferences
+- `PATCH /api/preferences` - Update preferences
+
+**Database Schema**:
+```sql
+CREATE TABLE user_preferences (
+  user_id INTEGER PRIMARY KEY,
+  metrics_poll_interval_ms INTEGER DEFAULT 300000,  -- 5 minutes
+  enable_notifications INTEGER DEFAULT 0,  -- 0 = off, 1 = on
+  power_threshold_watts REAL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Collection History
+
+**Features**:
+- Tracks all metrics collection attempts (success/failure)
+- Performance metrics (collection time in milliseconds)
+- Trigger source tracking (scheduler, manual, UI)
+- Statistics aggregation (success rate, average collection time)
+- Automatic cleanup (retention policy configurable)
+
+**API Endpoints**:
+- Collection history is automatically created by scheduler and manual collection
+- Statistics can be queried via `collectionHistoryDb.getStats(deviceId, hours)`
+
+**Database Schema**:
+```sql
+CREATE TABLE collection_history (
+  id INTEGER PRIMARY KEY,
+  device_id INTEGER NOT NULL,
+  success INTEGER NOT NULL DEFAULT 1,  -- 0 or 1
+  error_message TEXT,
+  collection_time_ms INTEGER NOT NULL,
+  triggered_by TEXT NOT NULL,  -- 'scheduler' | 'manual' | 'ui'
+  timestamp INTEGER NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
 
 ## Windows PC Requirements
 
