@@ -18,14 +18,14 @@ Your webapp now includes **automatic background database maintenance** that elim
 - `lib/maintenance-service.ts` - Background maintenance service
 - `instrumentation.ts` - Server startup hook
 - `AUTOMATIC-MAINTENANCE.md` - Detailed documentation
-- `DEPLOYMENT-GUIDE.md` - This guide
+- `docs/DEPLOYMENT-GUIDE.md` - This guide
 
 **Updated Files:**
 - `lib/db.ts` - Added WAL checkpoint functions and pragmas
 - `middleware.ts` - Added token caching (80% CPU reduction)
 - `app/api/db-maintenance/route.ts` - Manual trigger endpoints
 - `ecosystem.config.js` - Removed cron_restart (no longer needed)
-- `TROUBLESHOOTING.md` - Updated for automatic maintenance
+- `docs/TROUBLESHOOTING.md` - Updated for automatic maintenance
 
 ## Deployment Steps
 
@@ -253,7 +253,7 @@ pm2 restart "PC Remote Wake on Lan"
 
 For detailed information:
 - **Maintenance Details:** See `AUTOMATIC-MAINTENANCE.md`
-- **Troubleshooting:** See `TROUBLESHOOTING.md`
+- **Troubleshooting:** See `docs/TROUBLESHOOTING.md`
 - **General Issues:** Check PM2 logs and GitHub issues
 
 ## Summary

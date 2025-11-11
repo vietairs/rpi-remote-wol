@@ -81,7 +81,7 @@ if [ "$all_passed" = true ]; then
     echo "2. Start server: npm start"
     echo "3. Access from mobile device and add to home screen"
     echo ""
-    echo "📖 See PWA_SETUP.md for installation instructions"
+    echo "📖 See docs/PWA_SETUP.md for installation instructions"
     exit 0
 else
     echo "⚠️  Some PWA files are missing. Please run:"

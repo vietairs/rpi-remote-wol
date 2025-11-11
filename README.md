@@ -183,7 +183,7 @@ Then access from any device on your network: `http://<raspberry-pi-ip>:3000`
 2. Tap the menu (⋮) → "Add to Home screen" or "Install app"
 3. The app icon will appear on your home screen
 
-Once installed, the app runs in standalone mode (no browser UI) and works offline. See [PWA_SETUP.md](PWA_SETUP.md) for detailed instructions.
+Once installed, the app runs in standalone mode (no browser UI) and works offline. See [PWA Setup Guide](docs/PWA_SETUP.md) for detailed instructions.
 
 ### Adding Devices
 
