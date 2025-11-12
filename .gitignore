@@ -44,3 +44,6 @@ next-env.d.ts
 
 # database
 /data
+
+# project documentation
+CLAUDE.md
