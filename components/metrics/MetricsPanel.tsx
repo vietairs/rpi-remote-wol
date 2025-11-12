@@ -305,6 +305,7 @@ export default function MetricsPanel({ deviceId, deviceName, deviceIpAddress, on
             max={1000}
             icon="networkRx"
             subtitle="Download Speed"
+            adaptiveUnit={true}
           />
         )}
 
@@ -317,6 +318,7 @@ export default function MetricsPanel({ deviceId, deviceName, deviceIpAddress, on
             max={1000}
             icon="networkTx"
             subtitle="Upload Speed"
+            adaptiveUnit={true}
           />
         )}
 

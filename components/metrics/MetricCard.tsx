@@ -8,6 +8,7 @@ interface MetricCardProps {
   max?: number;
   icon: MetricType;
   subtitle?: string;
+  adaptiveUnit?: boolean; // Enable adaptive unit scaling (e.g., Kbps → Mbps → Gbps)
 }
 
 const iconMap: Record<MetricType, LucideIcon> = {
@@ -26,8 +27,31 @@ export default function MetricCard({
   max = 100,
   icon,
   subtitle,
+  adaptiveUnit = false,
 }: MetricCardProps) {
-  const percentage = value !== null ? Math.min((value / max) * 100, 100) : 0;
+  // Adaptive unit scaling for network speeds (Mbps → Kbps/Mbps/Gbps)
+  let displayValue = value;
+  let displayUnit = unit;
+  let displayMax = max;
+
+  if (adaptiveUnit && value !== null && unit === 'Mbps') {
+    if (value < 1) {
+      // Convert to Kbps for values < 1 Mbps
+      displayValue = value * 1000;
+      displayUnit = 'Kbps';
+      displayMax = 1000;
+    } else if (value >= 1000) {
+      // Convert to Gbps for values >= 1000 Mbps
+      displayValue = value / 1000;
+      displayUnit = 'Gbps';
+      displayMax = 10; // Max 10 Gbps for typical home networks
+    } else {
+      // Keep as Mbps for values 1-999 Mbps
+      displayMax = 1000;
+    }
+  }
+
+  const percentage = displayValue !== null ? Math.min((displayValue / displayMax) * 100, 100) : 0;
   const IconComponent = iconMap[icon];
   const iconColorClass = metricIconColors[icon];
 
@@ -60,9 +84,9 @@ export default function MetricCard({
         </div>
         <div className={`text-right flex-shrink-0 ${getColor()}`}>
           <div className="text-2xl sm:text-3xl font-bold whitespace-nowrap">
-            {value !== null ? value.toFixed(1) : '--'}
+            {displayValue !== null ? displayValue.toFixed(1) : '--'}
           </div>
-          <div className="text-xs sm:text-sm font-medium">{unit}</div>
+          <div className="text-xs sm:text-sm font-medium">{displayUnit}</div>
         </div>
       </div>
 
