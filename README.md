@@ -411,7 +411,7 @@ To keep the application running on boot:
    Type=simple
    User=pi
    WorkingDirectory=/home/pi/rpi-remote-wol
-   ExecStart=/usr/bin/npm start
+   ExecStart=/usr/bin/env pnpm start
    Restart=on-failure
    Environment=NODE_ENV=production
    Environment=PORT=3000

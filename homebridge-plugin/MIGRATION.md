@@ -23,12 +23,12 @@
 
 ```bash
 cd ~/Projects/rpi-remote-wol/homebridge-plugin
-npm install
+pnpm install
 ```
 
-Or if installed globally via npm:
+Or if installed globally via pnpm:
 ```bash
-npm update -g homebridge-pc-remote-wake
+pnpm update -g homebridge-pc-remote-wake
 ```
 
 ### Step 2: Remove Old Accessories
@@ -144,7 +144,7 @@ If you need to revert to the old behavior:
 ```bash
 cd ~/Projects/rpi-remote-wol/homebridge-plugin
 git checkout v2.0.0
-npm install
+pnpm install
 # Restart Homebridge
 ```
 
