@@ -26,8 +26,8 @@ Monitor and control your Windows PC via Apple HomeKit using the PC Remote Wake A
 ```bash
 # From the rpi-remote-wol directory
 cd homebridge-plugin
-npm install
-sudo npm link
+pnpm install
+sudo pnpm link --global
 
 # Homebridge will now be able to find the plugin
 ```
@@ -36,7 +36,8 @@ sudo npm link
 
 ```bash
 # Install globally
-sudo npm install -g homebridge-pc-remote-wake
+sudo pnpm add -g homebridge-pc-remote-wake
+# (the plugin is also published on npm: sudo npm install -g homebridge-pc-remote-wake)
 ```
 
 ## Configuration

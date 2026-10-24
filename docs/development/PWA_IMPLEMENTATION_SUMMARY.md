@@ -200,8 +200,8 @@ export const viewport = {
 ## Testing Checklist
 
 ### Pre-Deployment
-- [x] Build production version: `npm run build`
-- [x] Verify PWA files: `npm run pwa:verify`
+- [x] Build production version: `pnpm run build`
+- [x] Verify PWA files: `pnpm run pwa:verify`
 - [x] Check manifest.json loads correctly
 - [x] Verify all icons exist and display correctly
 
@@ -237,18 +237,18 @@ export const viewport = {
 
 **Verify Setup:**
 ```bash
-npm run pwa:verify
+pnpm run pwa:verify
 ```
 
 **Regenerate Icons:**
 ```bash
-npm run pwa:icons
+pnpm run pwa:icons
 ```
 
 **Test Locally:**
 ```bash
-npm run build
-npm start
+pnpm run build
+pnpm start
 # Access from mobile device on same network
 ```
 

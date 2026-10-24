@@ -214,7 +214,7 @@ Windows PC (SSH) → PowerShell Commands → Metrics Data
   - **Status**: ⏳ Not Started
   - **Commands**:
     ```bash
-    sudo npm install -g --unsafe-perm homebridge homebridge-config-ui-x
+    sudo pnpm add -g homebridge homebridge-config-ui-x
     sudo hb-service install --user pi
     ```
   - **Validation**: Access UI at `http://raspberrypi.local:8581`

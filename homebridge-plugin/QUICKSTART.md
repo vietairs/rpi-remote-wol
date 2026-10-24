@@ -150,7 +150,7 @@ tail -f ~/.homebridge/homebridge.log
 ### Check plugin is loaded
 ```bash
 # Should show homebridge-pc-remote-wake
-npm list -g | grep homebridge-pc-remote-wake
+pnpm list -g | grep homebridge-pc-remote-wake
 ```
 
 ### Test API connection

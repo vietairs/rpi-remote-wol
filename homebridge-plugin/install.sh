@@ -22,7 +22,7 @@ if ! command -v homebridge &> /dev/null; then
     echo "❌ Error: Homebridge is not installed"
     echo ""
     echo "Please install Homebridge first:"
-    echo "  sudo npm install -g --unsafe-perm homebridge homebridge-config-ui-x"
+    echo "  sudo pnpm add -g homebridge homebridge-config-ui-x"
     echo ""
     echo "Or visit: https://github.com/homebridge/homebridge/wiki/Install-Homebridge-on-Raspbian"
     exit 1
@@ -34,12 +34,12 @@ echo ""
 # Install plugin dependencies
 echo "📦 Installing plugin dependencies..."
 cd "$(dirname "$0")"
-npm install
+pnpm install
 echo ""
 
 # Link plugin globally
 echo "🔗 Linking plugin to Homebridge..."
-sudo npm link
+sudo pnpm link --global
 echo ""
 
 echo "✅ Plugin installed successfully!"

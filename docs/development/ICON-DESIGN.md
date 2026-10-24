@@ -98,7 +98,7 @@ public/
 If you modify `icon.svg`, regenerate all PNG sizes:
 
 ```bash
-npm run icons:generate
+pnpm run icons:generate
 ```
 
 This runs `scripts/generate-icons-modern.js` which uses Sharp to create all required sizes.

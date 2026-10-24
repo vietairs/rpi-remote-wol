@@ -54,7 +54,7 @@ cd /path/to/rpi-remote-wol
 git pull
 
 # Rebuild application
-npm run build
+pnpm run build
 ```
 
 ### 3. Restart with New PM2 Configuration
@@ -243,7 +243,7 @@ git log --oneline -n 5  # Find previous commit hash
 git checkout <previous-commit-hash>
 
 # Rebuild
-npm run build
+pnpm run build
 
 # Restart PM2
 pm2 restart "PC Remote Wake on Lan"

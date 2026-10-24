@@ -102,7 +102,7 @@ After installation, verify it's working:
 
 ```bash
 # Check if plugin is linked
-npm list -g | grep homebridge-pc-remote-wake
+pnpm list -g | grep homebridge-pc-remote-wake
 
 # Should output:
 # homebridge-pc-remote-wake@1.0.0
@@ -141,7 +141,7 @@ whoami
 ### Homebridge Not Found
 ```bash
 # Install Homebridge first
-sudo npm install -g --unsafe-perm homebridge homebridge-config-ui-x
+sudo pnpm add -g homebridge homebridge-config-ui-x
 ```
 
 ### Plugin Not Showing Up

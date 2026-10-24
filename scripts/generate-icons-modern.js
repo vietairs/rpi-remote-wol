@@ -14,7 +14,7 @@ try {
   sharp = require('sharp');
 } catch (error) {
   console.error('⚠️  Sharp not installed. Installing...');
-  console.log('Run: npm install --save-dev sharp');
+  console.log('Run: pnpm add -D sharp');
   console.log('Then run this script again.');
   process.exit(1);
 }
@@ -68,7 +68,7 @@ async function generateIcons() {
     // For now, just copy the 32x32 PNG
     console.log('ℹ️  For best results, convert favicon-32x32.png to favicon.ico using:');
     console.log('   Online tool: https://convertio.co/png-ico/');
-    console.log('   Or: npm install -g sharp-cli && sharp-cli favicon-32x32.png -o favicon.ico');
+    console.log('   Or: pnpm add -g sharp-cli && sharp-cli favicon-32x32.png -o favicon.ico');
   } catch (error) {
     console.error('❌ Favicon generation note:', error.message);
   }

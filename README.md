@@ -92,7 +92,7 @@ A Next.js web application for remotely managing your Windows 11 PC using Wake-on
 
 2. **Install dependencies:**
    ```bash
-   npm install
+   pnpm install
    ```
 
 3. **Configure environment variables:**
@@ -122,26 +122,26 @@ A Next.js web application for remotely managing your Windows 11 PC using Wake-on
 
 4. **Build the production version:**
    ```bash
-   npm run build
+   pnpm run build
    ```
 
 ## Running the Application
 
 ### Development Mode
 ```bash
-npm run dev
+pnpm run dev
 ```
 Access at: `http://localhost:3000`
 
 ### Production Mode
 ```bash
-npm run build
-npm start
+pnpm run build
+pnpm start
 ```
 
 ### Run on Different Port
 ```bash
-PORT=8080 npm start
+PORT=8080 pnpm start
 ```
 
 ### Access from Other Devices
@@ -411,7 +411,7 @@ To keep the application running on boot:
    Type=simple
    User=pi
    WorkingDirectory=/home/pi/rpi-remote-wol
-   ExecStart=/usr/bin/npm start
+   ExecStart=/usr/bin/env pnpm start
    Restart=on-failure
    Environment=NODE_ENV=production
    Environment=PORT=3000
@@ -444,7 +444,7 @@ To keep the application running on boot:
 
 ### Cannot access web interface
 
-- **Check if service is running:** `npm run dev` or check systemd status
+- **Check if service is running:** `pnpm run dev` or check systemd status
 - **Check firewall on Raspberry Pi:** `sudo ufw allow 3000`
 - **Verify IP address:** Use correct Raspberry Pi IP
 - **Check port:** Ensure the port (default 3000) is correct
@@ -482,19 +482,19 @@ Run the comprehensive E2E test suite:
 
 ```bash
 # Run all tests
-npm test
+pnpm test
 
 # Run tests with UI
-npm run test:ui
+pnpm run test:ui
 
 # Run tests in headed browser (watch execution)
-npm run test:headed
+pnpm run test:headed
 
 # Debug mode
-npm run test:debug
+pnpm run test:debug
 
 # View test report
-npm run test:report
+pnpm run test:report
 ```
 
 **Test Coverage:**
