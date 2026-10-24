@@ -152,11 +152,11 @@
 
 ### Package Scripts
 ```bash
-npm test              # Run all tests
-npm run test:ui       # Run with Playwright UI
-npm run test:headed   # Run in headed mode
-npm run test:debug    # Debug mode
-npm run test:report   # Show test report
+pnpm test              # Run all tests
+pnpm run test:ui       # Run with Playwright UI
+pnpm run test:headed   # Run in headed mode
+pnpm run test:debug    # Debug mode
+pnpm run test:report   # Show test report
 ```
 
 ## ⚙️ Test Configuration
@@ -237,27 +237,27 @@ npm run test:report   # Show test report
 
 ### Run All Tests
 ```bash
-npm test
+pnpm test
 ```
 
 ### Run Specific Test File
 ```bash
-npx playwright test tests/e2e/auth/setup.spec.ts
+pnpm exec playwright test tests/e2e/auth/setup.spec.ts
 ```
 
 ### Run in UI Mode (Recommended for Development)
 ```bash
-npm run test:ui
+pnpm run test:ui
 ```
 
 ### Debug Single Test
 ```bash
-npx playwright test tests/e2e/auth/setup.spec.ts --debug
+pnpm exec playwright test tests/e2e/auth/setup.spec.ts --debug
 ```
 
 ### View Test Report
 ```bash
-npm run test:report
+pnpm run test:report
 ```
 
 ## 📝 Test Maintenance

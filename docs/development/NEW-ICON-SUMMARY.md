@@ -80,7 +80,7 @@ git push
 # On Raspberry Pi
 cd /path/to/rpi-remote-wol
 git pull
-npm run build
+pnpm run build
 pm2 restart "PC Remote Wake on Lan"
 ```
 
@@ -89,7 +89,7 @@ That's it! No rebuild needed - icons are static files.
 ## Regenerate Icons (if you modify icon.svg)
 
 ```bash
-npm run icons:generate
+pnpm run icons:generate
 ```
 
 This automatically generates all required sizes from the master SVG.

@@ -48,7 +48,7 @@ Done! No rebuild needed - icons are static files.
 If you edit `public/icon.svg`:
 
 ```bash
-npm run icons:generate
+pnpm run icons:generate
 ```
 
 ## 📚 More Info

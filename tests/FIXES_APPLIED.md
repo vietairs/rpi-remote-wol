@@ -161,16 +161,16 @@ Tests:
 ### Run Fixed Tests
 ```bash
 # Run all setup tests (8 tests)
-npx playwright test tests/e2e/auth/setup.spec.ts
+pnpm exec playwright test tests/e2e/auth/setup.spec.ts
 
 # Run all login tests (10 tests)
-npx playwright test tests/e2e/auth/login.spec.ts
+pnpm exec playwright test tests/e2e/auth/login.spec.ts
 
 # Run all auth tests (32 tests)
-npx playwright test tests/e2e/auth/
+pnpm exec playwright test tests/e2e/auth/
 
 # Run with UI (recommended)
-npm run test:ui
+pnpm run test:ui
 ```
 
 ### Expected Results
@@ -211,19 +211,19 @@ All tests should pass with 100% success rate.
 ### To Run Full Test Suite
 ```bash
 # Option 1: Run all tests (takes 5-10 minutes for 100+ tests)
-npm test
+pnpm test
 
 # Option 2: Run specific test categories
-npm test tests/e2e/devices/
-npm test tests/e2e/network/
+pnpm test tests/e2e/devices/
+pnpm test tests/e2e/network/
 
 # Option 3: Run with UI for visual feedback
-npm run test:ui
+pnpm run test:ui
 ```
 
 ### For CI/CD Integration
 - Tests are ready for CI/CD pipelines
-- Use `npm test` in CI scripts
+- Use `pnpm test` in CI scripts
 - Configure retries: 2-3 for network operations
 - Set appropriate timeout: 10-15 minutes for full suite
 

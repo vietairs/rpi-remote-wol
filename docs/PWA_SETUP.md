@@ -134,13 +134,13 @@ The web app manifest (`public/manifest.json`) defines:
 
 For development testing:
 ```bash
-npm run build
-npm start
+pnpm run build
+pnpm start
 ```
 
 For Raspberry Pi deployment:
 ```bash
-npm run build
+pnpm run build
 # Service worker will be active when accessed from network
 ```
 
@@ -181,7 +181,7 @@ Edit `public/manifest.json`:
 - ✅ Check that manifest.json is loading (DevTools → Network)
 
 ### Service worker not registering
-- ✅ Service worker only works in production (`npm run build && npm start`)
+- ✅ Service worker only works in production (`pnpm run build && pnpm start`)
 - ✅ Check browser console for errors
 - ✅ Verify `public/sw.js` is accessible at `/sw.js`
 
